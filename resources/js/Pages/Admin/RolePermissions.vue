@@ -32,6 +32,7 @@ const props = defineProps({
 const selectedRole = ref(props.selectedRole || props.roles[0] || "");
 const search = ref("");
 const selectedPermissions = ref([]);
+const showResetAllModal = ref(false);
 
 watch(
     () => [selectedRole.value, props.rolePermissions],
@@ -98,6 +99,23 @@ const resetToDefault = () => {
         { preserveScroll: true }
     );
 };
+
+const resetAllRoles = () => {
+    router.patch("/admin/role-permissions/reset-all", {}, { preserveScroll: true });
+};
+
+const openResetAllModal = () => {
+    showResetAllModal.value = true;
+};
+
+const closeResetAllModal = () => {
+    showResetAllModal.value = false;
+};
+
+const confirmResetAllRoles = () => {
+    resetAllRoles();
+    closeResetAllModal();
+};
 </script>
 
 <template>
@@ -140,6 +158,9 @@ const resetToDefault = () => {
                         <p class="text-xs text-slate-500">Check permissions then save.</p>
                     </div>
                     <div class="flex gap-2">
+                        <button type="button" class="rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50" @click="openResetAllModal">
+                            Reset All Roles
+                        </button>
                         <button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100" @click="selectAllFiltered">
                             Select Filtered
                         </button>
@@ -182,6 +203,31 @@ const resetToDefault = () => {
                     </button>
                     <button type="button" class="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" @click="savePermissions">
                         Save Permissions
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showResetAllModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+                <h3 class="text-lg font-semibold text-slate-800">Reset All Role Permissions</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    This will reset every role to the default permission matrix. Continue?
+                </p>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button
+                        type="button"
+                        class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
+                        @click="closeResetAllModal"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+                        @click="confirmResetAllRoles"
+                    >
+                        Reset All
                     </button>
                 </div>
             </div>

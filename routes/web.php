@@ -241,6 +241,9 @@ Route::prefix('admin')
         Route::patch('/role-permissions/{role}/reset', [RolePermissionsController::class, 'reset'])
             ->middleware('permission:roles.manage')
             ->name('role-permissions.reset');
+        Route::patch('/role-permissions/reset-all', [RolePermissionsController::class, 'resetAll'])
+            ->middleware('permission:roles.manage')
+            ->name('role-permissions.reset-all');
         Route::get('/access-matrix', [AccessMatrixController::class, 'index'])
             ->middleware('permission:roles.manage')
             ->name('access-matrix');

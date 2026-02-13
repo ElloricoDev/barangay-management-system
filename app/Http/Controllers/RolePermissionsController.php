@@ -116,4 +116,29 @@ class RolePermissionsController extends Controller
 
         return redirect()->back()->with('success', 'Role permissions reset to defaults.');
     }
+
+    public function resetAll(Request $request)
+    {
+        $matrix = config('permissions.matrix', []);
+
+        foreach ($matrix as $role => $permissions) {
+            $record = RolePermission::query()->firstOrNew(['role' => $role]);
+            $record->permissions = array_values($permissions);
+            $record->updated_by = $request->user()->id;
+            $record->save();
+        }
+
+        RolePermission::forgetCache();
+
+        AuditLogger::log(
+            $request,
+            'role.permissions.reset_all',
+            RolePermission::class,
+            0,
+            null,
+            ['roles' => array_keys($matrix)]
+        );
+
+        return redirect()->back()->with('success', 'All role permissions reset to defaults.');
+    }
 }
