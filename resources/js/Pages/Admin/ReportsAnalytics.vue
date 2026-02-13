@@ -71,6 +71,15 @@ const formatDate = (value) => {
             <button type="submit" class="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">Apply Date Range</button>
         </form>
 
+        <div class="mb-4 flex justify-end">
+            <a
+                :href="`/admin/reports/export?date_from=${encodeURIComponent(props.filters.date_from || '')}&date_to=${encodeURIComponent(props.filters.date_to || '')}`"
+                class="rounded-md border border-emerald-300 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50"
+            >
+                Export CSV
+            </a>
+        </div>
+
         <div class="grid gap-4 md:grid-cols-4">
             <div class="rounded-lg border border-slate-200 bg-slate-50 p-4"><p class="text-xs uppercase text-slate-500">Residents</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ props.kpis.residents ?? 0 }}</p></div>
             <div class="rounded-lg border border-slate-200 bg-slate-50 p-4"><p class="text-xs uppercase text-slate-500">Certificates</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ props.kpis.certificates ?? 0 }}</p></div>

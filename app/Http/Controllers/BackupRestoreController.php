@@ -57,6 +57,9 @@ class BackupRestoreController extends Controller
                 'tables' => self::TABLES,
             ],
             'tables' => [],
+            'files' => [
+                'documents' => [],
+            ],
         ];
 
         foreach (self::TABLES as $table) {
@@ -67,6 +70,8 @@ class BackupRestoreController extends Controller
 
             $snapshot['tables'][$table] = DB::table($table)->get()->map(fn ($row) => (array) $row)->all();
         }
+
+        $snapshot['files']['documents'] = $this->captureDocumentFiles($snapshot['tables']['documents'] ?? []);
 
         $filename = 'backup-'.now()->format('Ymd-His').'.json';
         $path = self::DIRECTORY.'/'.$filename;
@@ -168,6 +173,8 @@ class BackupRestoreController extends Controller
 
             $this->enableForeignKeys($driver);
             DB::commit();
+
+            $this->restoreDocumentFiles($payload['files']['documents'] ?? []);
         } catch (\Throwable $e) {
             DB::rollBack();
             $this->enableForeignKeys($driver);
@@ -208,6 +215,80 @@ class BackupRestoreController extends Controller
 
         if ($driver === 'sqlite') {
             DB::statement('PRAGMA foreign_keys = ON');
+        }
+    }
+
+    private function captureDocumentFiles(array $documents): array
+    {
+        $files = [];
+        $maxSize = 2 * 1024 * 1024; // 2MB per file in snapshot
+
+        foreach ($documents as $document) {
+            $diskName = $document['disk'] ?? null;
+            $path = $document['path'] ?? null;
+            if (! is_string($diskName) || ! is_string($path)) {
+                continue;
+            }
+
+            $disk = Storage::disk($diskName);
+            if (! $disk->exists($path)) {
+                continue;
+            }
+
+            $size = (int) ($document['file_size'] ?? $disk->size($path) ?? 0);
+            if ($size > $maxSize) {
+                $files[] = [
+                    'disk' => $diskName,
+                    'path' => $path,
+                    'skipped' => true,
+                    'reason' => 'file_too_large',
+                    'size' => $size,
+                ];
+                continue;
+            }
+
+            $content = $disk->get($path);
+
+            $files[] = [
+                'disk' => $diskName,
+                'path' => $path,
+                'content_base64' => base64_encode($content),
+                'size' => $size,
+                'mime_type' => $document['mime_type'] ?? null,
+            ];
+        }
+
+        return $files;
+    }
+
+    private function restoreDocumentFiles(array $files): void
+    {
+        Storage::disk('public')->deleteDirectory('documents');
+        Storage::disk('public')->makeDirectory('documents');
+
+        foreach ($files as $file) {
+            if (! is_array($file)) {
+                continue;
+            }
+
+            if (($file['skipped'] ?? false) === true) {
+                continue;
+            }
+
+            $diskName = $file['disk'] ?? null;
+            $path = $file['path'] ?? null;
+            $contentBase64 = $file['content_base64'] ?? null;
+
+            if (! is_string($diskName) || ! is_string($path) || ! is_string($contentBase64)) {
+                continue;
+            }
+
+            $decoded = base64_decode($contentBase64, true);
+            if ($decoded === false) {
+                continue;
+            }
+
+            Storage::disk($diskName)->put($path, $decoded);
         }
     }
 }

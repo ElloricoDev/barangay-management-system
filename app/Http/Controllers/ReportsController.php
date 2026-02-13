@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsController extends Controller
 {
@@ -28,6 +29,51 @@ class ReportsController extends Controller
         return Inertia::render('Admin/ReportsAnalytics', [
             'section' => 'analytics',
             ...$this->data($request),
+        ]);
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $data = $this->data($request);
+        $filename = 'reports-analytics-'.now()->format('Ymd-His').'.csv';
+
+        return response()->streamDownload(function () use ($data) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, ['Report', 'Value']);
+            fputcsv($handle, ['Residents', $data['kpis']['residents'] ?? 0]);
+            fputcsv($handle, ['Certificates', $data['kpis']['certificates'] ?? 0]);
+            fputcsv($handle, ['Blotters', $data['kpis']['blotters'] ?? 0]);
+            fputcsv($handle, ['Users', $data['kpis']['users'] ?? 0]);
+            fputcsv($handle, ['Collections Total', $data['kpis']['collections_total'] ?? 0]);
+            fputcsv($handle, ['Collections Range', $data['kpis']['collections_range'] ?? 0]);
+            fputcsv($handle, ['Audit Events Range', $data['kpis']['audit_events_range'] ?? 0]);
+
+            fputcsv($handle, []);
+            fputcsv($handle, ['Timeline', 'Residents', 'Certificates', 'Collections']);
+            foreach ($data['timeline'] as $row) {
+                fputcsv($handle, [
+                    $row['period'] ?? '',
+                    $row['residents'] ?? 0,
+                    $row['certificates'] ?? 0,
+                    $row['collections'] ?? 0,
+                ]);
+            }
+
+            fputcsv($handle, []);
+            fputcsv($handle, ['Top Service Type', 'Transactions', 'Amount']);
+            foreach ($data['topServices'] as $row) {
+                fputcsv($handle, [
+                    $row['service_type'] ?? '',
+                    $row['transactions'] ?? 0,
+                    $row['amount'] ?? 0,
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 

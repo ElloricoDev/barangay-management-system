@@ -203,6 +203,9 @@ Route::prefix('admin')
         Route::get('/reports', [ReportsController::class, 'reports'])
             ->middleware('permission:reports.view')
             ->name('reports');
+        Route::get('/reports/export', [ReportsController::class, 'exportCsv'])
+            ->middleware('permission:reports.view')
+            ->name('reports.export');
 
         Route::get('/document-archive', [DocumentsController::class, 'archiveIndex'])
             ->middleware('permission:document_archive.view')
