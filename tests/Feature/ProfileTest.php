@@ -1,61 +1,98 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 
-test('profile page is displayed', function () {
-    $user = User::factory()->create();
+uses(RefreshDatabase::class);
 
-    $response = $this
-        ->actingAs($user)
-        ->get('/profile');
-
-    $response->assertOk();
+beforeEach(function () {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
 });
 
-test('profile information can be updated', function () {
-    $user = User::factory()->create();
+test('admin account page is displayed', function () {
+    $user = User::factory()->create([
+        'role' => 'super_admin',
+    ]);
+
+    $this->actingAs($user)->get('/admin/account')->assertOk();
+});
+
+test('admin account profile can be updated', function () {
+    $user = User::factory()->create([
+        'role' => 'super_admin',
+    ]);
 
     $response = $this
         ->actingAs($user)
-        ->patch('/profile', [
+        ->from('/admin/account')
+        ->put('/admin/account/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect('/profile');
+        ->assertRedirect('/admin/account');
 
     $user->refresh();
 
     $this->assertSame('Test User', $user->name);
     $this->assertSame('test@example.com', $user->email);
-    $this->assertNull($user->email_verified_at);
+    $response->assertSessionHas('success');
 });
 
-test('email verification status is unchanged when the email address is unchanged', function () {
-    $user = User::factory()->create();
+test('admin account password can be updated', function () {
+    $user = User::factory()->create([
+        'role' => 'super_admin',
+    ]);
 
     $response = $this
         ->actingAs($user)
-        ->patch('/profile', [
-            'name' => 'Test User',
-            'email' => $user->email,
+        ->from('/admin/account')
+        ->put('/admin/account/password', [
+            'current_password' => 'password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
         ]);
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect('/profile');
+        ->assertRedirect('/admin/account');
 
-    $this->assertNotNull($user->refresh()->email_verified_at);
+    $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+    $response->assertSessionHas('success');
 });
 
-test('user can delete their account', function () {
-    $user = User::factory()->create();
+test('admin account password requires correct current password', function () {
+    $user = User::factory()->create([
+        'role' => 'super_admin',
+    ]);
 
     $response = $this
         ->actingAs($user)
-        ->delete('/profile', [
+        ->from('/admin/account')
+        ->put('/admin/account/password', [
+            'current_password' => 'wrong-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ]);
+
+    $response
+        ->assertSessionHasErrors('current_password')
+        ->assertRedirect('/admin/account');
+});
+
+test('admin can delete own account with current password', function () {
+    $user = User::factory()->create([
+        'role' => 'super_admin',
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->from('/admin/account')
+        ->delete('/admin/account', [
             'password' => 'password',
         ]);
 
@@ -67,19 +104,21 @@ test('user can delete their account', function () {
     $this->assertNull($user->fresh());
 });
 
-test('correct password must be provided to delete account', function () {
-    $user = User::factory()->create();
+test('admin account deletion requires correct password', function () {
+    $user = User::factory()->create([
+        'role' => 'super_admin',
+    ]);
 
     $response = $this
         ->actingAs($user)
-        ->from('/profile')
-        ->delete('/profile', [
+        ->from('/admin/account')
+        ->delete('/admin/account', [
             'password' => 'wrong-password',
         ]);
 
     $response
         ->assertSessionHasErrors('password')
-        ->assertRedirect('/profile');
+        ->assertRedirect('/admin/account');
 
     $this->assertNotNull($user->fresh());
 });

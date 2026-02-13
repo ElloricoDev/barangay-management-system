@@ -1,60 +1,33 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-test('reset password link screen can be rendered', function () {
-    $response = $this->get('/forgot-password');
+uses(RefreshDatabase::class);
 
-    $response->assertStatus(200);
+beforeEach(function () {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
 });
 
-test('reset password link can be requested', function () {
-    Notification::fake();
-
+test('forgot password route is retired', function () {
     $user = User::factory()->create();
 
-    $this->post('/forgot-password', ['email' => $user->email]);
-
-    Notification::assertSentTo($user, ResetPassword::class);
+    $this->actingAs($user)->get('/forgot-password')->assertNotFound();
 });
 
-test('reset password screen can be rendered', function () {
-    Notification::fake();
-
+test('forgot password submit route is retired', function () {
     $user = User::factory()->create();
 
-    $this->post('/forgot-password', ['email' => $user->email]);
-
-    Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
-        $response = $this->get('/reset-password/'.$notification->token);
-
-        $response->assertStatus(200);
-
-        return true;
-    });
+    $this->post('/forgot-password', ['email' => $user->email])->assertNotFound();
 });
 
-test('password can be reset with valid token', function () {
-    Notification::fake();
-
-    $user = User::factory()->create();
-
-    $this->post('/forgot-password', ['email' => $user->email]);
-
-    Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
-        $response = $this->post('/reset-password', [
-            'token' => $notification->token,
-            'email' => $user->email,
-            'password' => 'password',
-            'password_confirmation' => 'password',
-        ]);
-
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect(route('login'));
-
-        return true;
-    });
+test('reset password routes are retired', function () {
+    $this->get('/reset-password/test-token')->assertNotFound();
+    $this->post('/reset-password', [
+        'token' => 'test-token',
+        'email' => 'test@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ])->assertNotFound();
 });

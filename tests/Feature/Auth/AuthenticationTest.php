@@ -1,34 +1,57 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-test('login screen can be rendered', function () {
-    $response = $this->get('/login');
+uses(RefreshDatabase::class);
 
-    $response->assertStatus(200);
+beforeEach(function () {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
 });
 
-test('users can authenticate using the login screen', function () {
-    $user = User::factory()->create();
+test('welcome page can be rendered', function () {
+    $this->get('/')->assertStatus(200);
+});
 
-    $response = $this->post('/login', [
+test('staff users can authenticate using login endpoint', function () {
+    $user = User::factory()->create([
+        'role' => 'staff_user',
+    ]);
+
+    $response = $this->from('/')->post('/login', [
         'email' => $user->email,
         'password' => 'password',
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard', absolute: false));
+    $response->assertRedirect(route('staff.dashboard', absolute: false));
+});
+
+test('admin users can authenticate using login endpoint', function () {
+    $user = User::factory()->create([
+        'role' => 'super_admin',
+    ]);
+
+    $response = $this->from('/')->post('/login', [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $this->assertAuthenticated();
+    $response->assertRedirect(route('admin.dashboard', absolute: false));
 });
 
 test('users can not authenticate with invalid password', function () {
     $user = User::factory()->create();
 
-    $this->post('/login', [
+    $response = $this->from('/')->post('/login', [
         'email' => $user->email,
         'password' => 'wrong-password',
     ]);
 
     $this->assertGuest();
+    $response->assertSessionHasErrors('email');
 });
 
 test('users can logout', function () {

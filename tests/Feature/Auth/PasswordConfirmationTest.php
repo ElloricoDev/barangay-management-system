@@ -1,32 +1,27 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-test('confirm password screen can be rendered', function () {
-    $user = User::factory()->create();
+uses(RefreshDatabase::class);
 
-    $response = $this->actingAs($user)->get('/confirm-password');
-
-    $response->assertStatus(200);
+beforeEach(function () {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
 });
 
-test('password can be confirmed', function () {
+test('confirm password screen route is retired', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get('/confirm-password')->assertNotFound();
+});
+
+test('confirm password submit route is retired', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->post('/confirm-password', [
         'password' => 'password',
     ]);
 
-    $response->assertRedirect();
-    $response->assertSessionHasNoErrors();
-});
-
-test('password is not confirmed with invalid password', function () {
-    $user = User::factory()->create();
-
-    $response = $this->actingAs($user)->post('/confirm-password', [
-        'password' => 'wrong-password',
-    ]);
-
-    $response->assertSessionHasErrors();
+    $response->assertNotFound();
 });
