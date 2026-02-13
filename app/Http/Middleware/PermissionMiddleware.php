@@ -25,7 +25,7 @@ class PermissionMiddleware
         }
 
         $canDelegateApproval = in_array($permission, ['certificates.approve', 'blotter.approve'], true)
-            && $user->role === 'staff'
+            && $user->isStaffPanelRole()
             && DelegationSetting::current()->staff_can_approve;
 
         if (! $canDelegateApproval) {

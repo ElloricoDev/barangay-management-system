@@ -17,15 +17,15 @@ class UserSeeder extends Seeder
         User::factory()
         ->count(10)
         ->create([
-            'role' => 'staff'
+            'role' => 'staff_user'
             ]);
 
         User::updateOrCreate(
-            ['email' => 'captain@gmail.com'],
+            ['email' => 'superadmin@gmail.com'],
             [
-                'name' => 'Barangay Captain',
-                'password' => Hash::make('captain123'),
-                'role' => 'captain',
+                'name' => 'Punong Barangay',
+                'password' => Hash::make('superadmin123'),
+                'role' => 'super_admin',
             ]
         );
 
@@ -34,7 +34,70 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Barangay Secretary',
                 'password' => Hash::make('secretary123'),
-                'role' => 'secretary',
+                'role' => 'records_administrator',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'treasurer@gmail.com'],
+            [
+                'name' => 'Barangay Treasurer',
+                'password' => Hash::make('treasurer123'),
+                'role' => 'finance_officer',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'itadmin@gmail.com'],
+            [
+                'name' => 'IT Administrator',
+                'password' => Hash::make('itadmin123'),
+                'role' => 'technical_administrator',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'kagawad@gmail.com'],
+            [
+                'name' => 'Barangay Kagawad',
+                'password' => Hash::make('kagawad123'),
+                'role' => 'committee_access_user',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'skchair@gmail.com'],
+            [
+                'name' => 'SK Chairperson',
+                'password' => Hash::make('skchair123'),
+                'role' => 'youth_administrator',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'records@gmail.com'],
+            [
+                'name' => 'Records Officer',
+                'password' => Hash::make('records123'),
+                'role' => 'data_manager',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'staff@gmail.com'],
+            [
+                'name' => 'Administrative Staff',
+                'password' => Hash::make('staff12345'),
+                'role' => 'staff_user',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'encoder@gmail.com'],
+            [
+                'name' => 'Barangay Encoder',
+                'password' => Hash::make('encoder123'),
+                'role' => 'encoder',
             ]
         );
     }

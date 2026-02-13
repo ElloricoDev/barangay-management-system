@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -29,13 +30,24 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $settings = SystemSetting::current();
+
         return [
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
                 'permissions' => $request->user()
-                    ? (config('permissions.matrix')[$request->user()->role] ?? [])
+                    ? collect(config('permissions.matrix', []))
+                        ->flatten()
+                        ->unique()
+                        ->filter(fn ($permission) => $request->user()->hasPermission((string) $permission))
+                        ->values()
+                        ->all()
                     : [],
+            ],
+            'systemSettings' => fn () => [
+                'barangay_name' => $settings->barangay_name,
+                'maintenance_mode' => $settings->maintenance_mode,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

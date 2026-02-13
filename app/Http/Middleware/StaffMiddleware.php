@@ -13,11 +13,12 @@ class StaffMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->user() || $request->user()->role !== 'staff') {
+        $user = $request->user();
+
+        if (! $user || ! $user->isStaffPanelRole()) {
             abort(403, 'Unauthorized access.');
         }
 
         return $next($request);
     }
 }
-

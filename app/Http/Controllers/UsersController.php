@@ -24,7 +24,7 @@ class UsersController extends Controller
             $request->session()->regenerate();
 
             $user = $request->user();
-            $defaultRoute = $user->hasAnyRole(['captain', 'secretary', 'admin'])
+            $defaultRoute = $user->isAdminPanelRole()
                 ? route('admin.dashboard')
                 : route('staff.dashboard');
 
@@ -89,7 +89,7 @@ class UsersController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'role' => ['required', Rule::in(['captain', 'secretary', 'staff'])],
+            'role' => ['required', Rule::in($this->allowedRoles())],
             'password' => ['required', 'string', 'min:8'],
         ]);
 
@@ -119,7 +119,7 @@ class UsersController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'role' => ['required', Rule::in(['captain', 'secretary', 'staff'])],
+            'role' => ['required', Rule::in($this->allowedRoles())],
             'password' => ['nullable', 'string', 'min:8'],
         ]);
 
@@ -160,5 +160,20 @@ class UsersController extends Controller
         $user->save();
 
         return redirect()->back()->with('success', 'Password reset to default: password123');
+    }
+
+    private function allowedRoles(): array
+    {
+        return [
+            'super_admin',
+            'records_administrator',
+            'finance_officer',
+            'committee_access_user',
+            'youth_administrator',
+            'staff_user',
+            'encoder',
+            'data_manager',
+            'technical_administrator',
+        ];
     }
 }

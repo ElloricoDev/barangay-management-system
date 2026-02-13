@@ -47,21 +47,59 @@ class User extends Authenticatable
         ];
     }
 
+    public function roleSlug(): string
+    {
+        return match ($this->role) {
+            'admin', 'captain' => 'super_admin',
+            'secretary', 'records_manager' => 'records_administrator',
+            'staff', 'frontline_user' => 'staff_user',
+            'committee_access' => 'committee_access_user',
+            'youth_admin' => 'youth_administrator',
+            'system_admin' => 'technical_administrator',
+            default => $this->role,
+        };
+    }
+
     public function hasRole(string $role): bool
     {
-        return $this->role === $role;
+        return $this->roleSlug() === $role;
     }
 
     public function hasAnyRole(array $roles): bool
     {
-        return in_array($this->role, $roles, true);
+        return in_array($this->roleSlug(), $roles, true);
     }
 
     public function hasPermission(string $permission): bool
     {
         $matrix = config('permissions.matrix', []);
-        $rolePermissions = $matrix[$this->role] ?? [];
+        $role = $this->roleSlug();
+        $overrides = RolePermission::permissionsForRole($role);
+        $rolePermissions = is_array($overrides)
+            ? $overrides
+            : ($matrix[$role] ?? []);
 
         return in_array($permission, $rolePermissions, true);
+    }
+
+    public function isAdminPanelRole(): bool
+    {
+        return $this->hasAnyRole([
+            'super_admin',
+            'records_administrator',
+            'finance_officer',
+            'technical_administrator',
+            'committee_access_user',
+            'youth_administrator',
+        ]);
+    }
+
+    public function isStaffPanelRole(): bool
+    {
+        return $this->hasAnyRole([
+            'staff_user',
+            'encoder',
+            'data_manager',
+        ]);
     }
 }

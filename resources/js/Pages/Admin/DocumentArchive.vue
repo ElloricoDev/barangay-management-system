@@ -1,0 +1,248 @@
+<script setup>
+import { computed, ref } from "vue";
+import { Link, router, usePage } from "@inertiajs/vue3";
+import AdminLayout from "../../Layouts/AdminLayout.vue";
+
+const page = usePage();
+const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
+const permissions = computed(() => page.props.auth?.permissions ?? []);
+const canDelete = computed(() => permissions.value.includes("documents.delete"));
+
+const props = defineProps({
+    documents: {
+        type: Object,
+        required: true,
+    },
+    filters: {
+        type: Object,
+        default: () => ({ search: "", module: "", sort: "created_at", direction: "desc" }),
+    },
+});
+
+const search = computed({
+    get: () => props.filters?.search ?? "",
+    set: (value) => {
+        router.get(
+            "/admin/document-archive",
+            {
+                search: value,
+                module: props.filters?.module ?? "",
+                sort: props.filters?.sort ?? "created_at",
+                direction: props.filters?.direction ?? "desc",
+            },
+            { preserveState: true, replace: true }
+        );
+    },
+});
+
+const moduleFilter = computed({
+    get: () => props.filters?.module ?? "",
+    set: (value) => {
+        router.get(
+            "/admin/document-archive",
+            {
+                search: props.filters?.search ?? "",
+                module: value,
+                sort: props.filters?.sort ?? "created_at",
+                direction: props.filters?.direction ?? "desc",
+            },
+            { preserveState: true, replace: true }
+        );
+    },
+});
+
+const sortBy = (column) => {
+    const isCurrent = (props.filters?.sort ?? "created_at") === column;
+    const nextDirection = isCurrent && (props.filters?.direction ?? "desc") === "asc" ? "desc" : "asc";
+
+    router.get(
+        "/admin/document-archive",
+        {
+            search: props.filters?.search ?? "",
+            module: props.filters?.module ?? "",
+            sort: column,
+            direction: nextDirection,
+        },
+        { preserveState: true, replace: true }
+    );
+};
+
+const sortIndicator = (column) => {
+    if ((props.filters?.sort ?? "created_at") !== column) return "";
+    return (props.filters?.direction ?? "desc") === "asc" ? "^" : "v";
+};
+
+const showDeleteModal = ref(false);
+const selectedDocument = ref(null);
+
+const openDeleteModal = (document) => {
+    selectedDocument.value = document;
+    showDeleteModal.value = true;
+};
+
+const closeDeleteModal = () => {
+    showDeleteModal.value = false;
+    selectedDocument.value = null;
+};
+
+const confirmDelete = () => {
+    if (!selectedDocument.value) return;
+    router.delete(`/admin/documents/${selectedDocument.value.id}`, {
+        preserveScroll: true,
+        onSuccess: () => closeDeleteModal(),
+    });
+};
+
+const formatBytes = (value) => {
+    const bytes = Number(value ?? 0);
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const formatDate = (value) => {
+    if (!value) return "-";
+    return new Date(value).toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+};
+</script>
+
+<template>
+    <AdminLayout title="Document Archive" :user-name="userName">
+        <template #header>
+            <div class="mb-4 border-b pb-4">
+                <h2 class="text-xl font-semibold text-slate-800">Document Archive</h2>
+                <p class="text-sm text-slate-500">Central archive for uploaded supporting files.</p>
+            </div>
+        </template>
+
+        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {{ page.props.flash.success }}
+        </div>
+        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            {{ page.props.flash.error }}
+        </div>
+
+        <div class="mb-4 flex flex-wrap items-end gap-3">
+            <div>
+                <label class="mb-1 block text-xs font-medium text-slate-600">Search</label>
+                <input
+                    v-model="search"
+                    type="text"
+                    placeholder="Title, filename, module..."
+                    class="w-72 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                />
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-medium text-slate-600">Module</label>
+                <select
+                    v-model="moduleFilter"
+                    class="w-44 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                >
+                    <option value="">All Modules</option>
+                    <option value="resident">Resident</option>
+                    <option value="certificate">Certificate</option>
+                    <option value="blotter">Blotter</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-lg border border-slate-200">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">
+                            <button type="button" @click="sortBy('title')">Title {{ sortIndicator("title") }}</button>
+                        </th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">
+                            <button type="button" @click="sortBy('module')">Module {{ sortIndicator("module") }}</button>
+                        </th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">Resident</th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">
+                            <button type="button" @click="sortBy('original_name')">File {{ sortIndicator("original_name") }}</button>
+                        </th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">
+                            <button type="button" @click="sortBy('file_size')">Size {{ sortIndicator("file_size") }}</button>
+                        </th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">
+                            <button type="button" @click="sortBy('created_at')">Uploaded {{ sortIndicator("created_at") }}</button>
+                        </th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">By</th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                    <tr v-for="document in props.documents.data" :key="document.id">
+                        <td class="px-4 py-3 text-slate-700">{{ document.title }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ document.module ?? "-" }}</td>
+                        <td class="px-4 py-3 text-slate-700">
+                            {{ document.resident ? `${document.resident.last_name}, ${document.resident.first_name}` : "-" }}
+                        </td>
+                        <td class="px-4 py-3 text-slate-700">{{ document.original_name }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ formatBytes(document.file_size) }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ formatDate(document.created_at) }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ document.uploader?.name ?? "-" }}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex gap-2">
+                                <a
+                                    :href="`/admin/documents/${document.id}/download`"
+                                    class="rounded-md border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+                                >
+                                    Download
+                                </a>
+                                <button
+                                    v-if="canDelete"
+                                    type="button"
+                                    class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50"
+                                    @click="openDeleteModal(document)"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr v-if="props.documents.data.length === 0">
+                        <td colspan="8" class="px-4 py-6 text-center text-slate-500">No documents found.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+            <Link
+                v-for="link in props.documents.links"
+                :key="link.label"
+                :href="link.url || '#'"
+                class="rounded-md border px-3 py-1 text-sm"
+                :class="[
+                    link.active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700',
+                    !link.url ? 'pointer-events-none opacity-50' : '',
+                ]"
+                v-html="link.label"
+            />
+        </div>
+
+        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+                <h3 class="text-lg font-semibold text-slate-800">Delete Document</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    Delete <span class="font-medium">{{ selectedDocument?.original_name }}</span>?
+                </p>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" @click="closeDeleteModal">
+                        Cancel
+                    </button>
+                    <button type="button" class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700" @click="confirmDelete">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </AdminLayout>
+</template>

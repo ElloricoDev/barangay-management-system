@@ -6,6 +6,24 @@ import AdminLayout from "../../Layouts/AdminLayout.vue";
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
 const currentUserId = computed(() => page.props.auth?.user?.id);
+const roleOptions = [
+    { value: "super_admin", label: "Super Administrator (Punong Barangay)" },
+    { value: "records_administrator", label: "Records Administrator (Barangay Secretary)" },
+    { value: "finance_officer", label: "Finance Officer (Barangay Treasurer)" },
+    { value: "committee_access_user", label: "Committee Access User (Barangay Kagawad)" },
+    { value: "youth_administrator", label: "Youth Administrator (SK Chairperson)" },
+    { value: "staff_user", label: "Staff User (Administrative Staff)" },
+    { value: "data_manager", label: "Data Manager (Records Officer)" },
+    { value: "encoder", label: "Encoder (Data Entry Personnel)" },
+    { value: "technical_administrator", label: "Technical Administrator (IT/System Admin)" },
+];
+
+const roleLabelMap = roleOptions.reduce((acc, role) => {
+    acc[role.value] = role.label;
+    return acc;
+}, {});
+
+const roleLabel = (role) => roleLabelMap[role] ?? role;
 
 const props = defineProps({
     users: {
@@ -56,7 +74,7 @@ const sortIndicator = (column) => {
 const createForm = useForm({
     name: "",
     email: "",
-    role: "staff",
+    role: "staff_user",
     password: "",
 });
 
@@ -75,7 +93,7 @@ const showResetModal = ref(false);
 const editForm = useForm({
     name: "",
     email: "",
-    role: "staff",
+    role: "staff_user",
     password: "",
 });
 
@@ -177,9 +195,9 @@ const confirmResetPassword = () => {
                 </div>
                 <div>
                     <select v-model="createForm.role" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none">
-                        <option value="staff">staff</option>
-                        <option value="secretary">secretary</option>
-                        <option value="captain">captain</option>
+                        <option v-for="role in roleOptions" :key="role.value" :value="role.value">
+                            {{ role.label }}
+                        </option>
                     </select>
                     <p v-if="createForm.errors.role" class="mt-1 text-xs text-rose-600">{{ createForm.errors.role }}</p>
                 </div>
@@ -226,7 +244,7 @@ const confirmResetPassword = () => {
                     <tr v-for="user in props.users.data" :key="user.id">
                         <td class="px-4 py-3 text-slate-700">{{ user.name }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ user.email }}</td>
-                        <td class="px-4 py-3 text-slate-700">{{ user.role }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ roleLabel(user.role) }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ user.created_at }}</td>
                         <td class="px-4 py-3">
                             <div class="flex flex-wrap gap-2">
@@ -287,9 +305,9 @@ const confirmResetPassword = () => {
                     </div>
                     <div>
                         <select v-model="editForm.role" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none">
-                            <option value="staff">staff</option>
-                            <option value="secretary">secretary</option>
-                            <option value="captain">captain</option>
+                            <option v-for="role in roleOptions" :key="role.value" :value="role.value">
+                                {{ role.label }}
+                            </option>
                         </select>
                         <p v-if="editForm.errors.role" class="mt-1 text-xs text-rose-600">{{ editForm.errors.role }}</p>
                     </div>
@@ -344,4 +362,3 @@ const confirmResetPassword = () => {
         </div>
     </AdminLayout>
 </template>
-

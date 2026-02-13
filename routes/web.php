@@ -5,9 +5,18 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AdminAccountController;
 use App\Http\Controllers\AuditLogsController;
 use App\Http\Controllers\DelegationController;
+use App\Http\Controllers\DocumentsController;
+use App\Http\Controllers\FinancialManagementController;
+use App\Http\Controllers\RolePermissionsController;
+use App\Http\Controllers\BackupRestoreController;
+use App\Http\Controllers\SystemLogsController;
+use App\Http\Controllers\YouthController;
+use App\Http\Controllers\ProgramsController;
+use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ResidentsController;
 use App\Http\Controllers\CertificatesController;
 use App\Http\Controllers\BlottersController;
+use App\Http\Controllers\SystemSettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -23,7 +32,7 @@ Route::post('/login', [UsersController::class, 'login'])->name('login');
 Route::post('/logout', [UsersController::class, 'logout'])->middleware('auth')->name('logout');
 
 Route::middleware('auth')->get('/dashboard', function () {
-    return auth()->user()->hasAnyRole(['captain', 'secretary', 'admin'])
+    return auth()->user()->isAdminPanelRole()
         ? redirect()->route('admin.dashboard')
         : redirect()->route('staff.dashboard');
 })->name('dashboard');
@@ -110,6 +119,140 @@ Route::prefix('admin')
         Route::patch('/delegation/toggle', [DelegationController::class, 'toggle'])
             ->middleware('permission:delegation.manage')
             ->name('delegation.toggle');
+
+        Route::get('/financial-management', [FinancialManagementController::class, 'financialManagement'])
+            ->middleware('permission:financial_management.view')
+            ->name('financial-management');
+        Route::get('/payment-processing', [FinancialManagementController::class, 'paymentProcessing'])
+            ->middleware('permission:payment_processing.view')
+            ->name('payment-processing');
+        Route::get('/official-receipts', [FinancialManagementController::class, 'officialReceipts'])
+            ->middleware('permission:official_receipts.view')
+            ->name('official-receipts');
+        Route::get('/collection-reports', [FinancialManagementController::class, 'collectionReports'])
+            ->middleware('permission:collection_reports.view')
+            ->name('collection-reports');
+        Route::get('/transaction-history', [FinancialManagementController::class, 'transactionHistory'])
+            ->middleware('permission:transaction_history.view')
+            ->name('transaction-history');
+        Route::get('/financial-summary', [FinancialManagementController::class, 'financialSummary'])
+            ->middleware('permission:financial_summary.view')
+            ->name('financial-summary');
+        Route::post('/payments', [FinancialManagementController::class, 'store'])
+            ->middleware('permission:finance.record')
+            ->name('payments.store');
+        Route::put('/payments/{payment}', [FinancialManagementController::class, 'update'])
+            ->middleware('permission:finance.record')
+            ->name('payments.update');
+        Route::delete('/payments/{payment}', [FinancialManagementController::class, 'destroy'])
+            ->middleware('permission:finance.record')
+            ->name('payments.destroy');
+        Route::get('/payments/export', [FinancialManagementController::class, 'exportCsv'])
+            ->middleware('permission:finance.reports.export')
+            ->name('payments.export');
+        Route::get('/payments/{payment}/receipt', [FinancialManagementController::class, 'receipt'])
+            ->middleware('permission:finance.receipts')
+            ->name('payments.receipt');
+
+        Route::get('/youth-management', [YouthController::class, 'management'])
+            ->middleware('permission:youth_management.view')
+            ->name('youth-management');
+        Route::get('/youth-residents', [YouthController::class, 'residents'])
+            ->middleware('permission:youth_residents.view')
+            ->name('youth-residents');
+        Route::get('/youth-programs', [YouthController::class, 'programs'])
+            ->middleware('permission:youth_programs.view')
+            ->name('youth-programs');
+        Route::post('/youth-programs', [YouthController::class, 'storeProgram'])
+            ->middleware('permission:youth.manage')
+            ->name('youth-programs.store');
+        Route::put('/youth-programs/{program}', [YouthController::class, 'updateProgram'])
+            ->middleware('permission:youth.manage')
+            ->name('youth-programs.update');
+        Route::delete('/youth-programs/{program}', [YouthController::class, 'destroyProgram'])
+            ->middleware('permission:youth.manage')
+            ->name('youth-programs.destroy');
+        Route::get('/youth-reports', [YouthController::class, 'reports'])
+            ->middleware('permission:youth_reports.view')
+            ->name('youth-reports');
+
+        Route::get('/programs-projects', [ProgramsController::class, 'projects'])
+            ->middleware('permission:programs.view')
+            ->name('programs-projects');
+        Route::post('/programs-projects', [ProgramsController::class, 'store'])
+            ->middleware('permission:programs.manage')
+            ->name('programs-projects.store');
+        Route::put('/programs-projects/{program}', [ProgramsController::class, 'update'])
+            ->middleware('permission:programs.manage')
+            ->name('programs-projects.update');
+        Route::delete('/programs-projects/{program}', [ProgramsController::class, 'destroy'])
+            ->middleware('permission:programs.manage')
+            ->name('programs-projects.destroy');
+
+        Route::get('/committee-reports', [ProgramsController::class, 'committeeReports'])
+            ->middleware('permission:committee_reports.view')
+            ->name('committee-reports');
+        Route::get('/programs-monitoring', [ProgramsController::class, 'monitoring'])
+            ->middleware('permission:programs_monitoring.view')
+            ->name('programs-monitoring');
+
+        Route::get('/reports-analytics', [ReportsController::class, 'analytics'])
+            ->middleware('permission:reports_analytics.view')
+            ->name('reports-analytics');
+
+        Route::get('/reports', [ReportsController::class, 'reports'])
+            ->middleware('permission:reports.view')
+            ->name('reports');
+
+        Route::get('/document-archive', [DocumentsController::class, 'archiveIndex'])
+            ->middleware('permission:document_archive.view')
+            ->name('document-archive');
+        Route::get('/documents/{document}/download', [DocumentsController::class, 'download'])
+            ->middleware('permission:documents.download')
+            ->name('documents.download');
+        Route::delete('/documents/{document}', [DocumentsController::class, 'destroy'])
+            ->middleware('permission:documents.delete')
+            ->name('documents.destroy');
+
+        Route::get('/role-permissions', [RolePermissionsController::class, 'index'])
+            ->middleware('permission:roles.manage')
+            ->name('role-permissions');
+        Route::put('/role-permissions/{role}', [RolePermissionsController::class, 'update'])
+            ->middleware('permission:roles.manage')
+            ->name('role-permissions.update');
+        Route::patch('/role-permissions/{role}/reset', [RolePermissionsController::class, 'reset'])
+            ->middleware('permission:roles.manage')
+            ->name('role-permissions.reset');
+
+        Route::get('/system-logs', [SystemLogsController::class, 'index'])
+            ->middleware('permission:system.logs.view')
+            ->name('system-logs');
+
+        Route::get('/backup-restore', [BackupRestoreController::class, 'index'])
+            ->middleware('permission:system.backup')
+            ->name('backup-restore');
+        Route::post('/backup-restore/create', [BackupRestoreController::class, 'create'])
+            ->middleware('permission:system.backup')
+            ->name('backup-restore.create');
+        Route::get('/backup-restore/{name}/download', [BackupRestoreController::class, 'download'])
+            ->middleware('permission:system.backup')
+            ->where('name', '.*')
+            ->name('backup-restore.download');
+        Route::delete('/backup-restore/{name}', [BackupRestoreController::class, 'destroy'])
+            ->middleware('permission:system.backup')
+            ->where('name', '.*')
+            ->name('backup-restore.destroy');
+        Route::post('/backup-restore/{name}/restore', [BackupRestoreController::class, 'restore'])
+            ->middleware('permission:backup.restore')
+            ->where('name', '.*')
+            ->name('backup-restore.restore');
+
+        Route::get('/system-settings', [SystemSettingsController::class, 'index'])
+            ->middleware('permission:system.settings')
+            ->name('system-settings');
+        Route::put('/system-settings', [SystemSettingsController::class, 'update'])
+            ->middleware('permission:system.settings')
+            ->name('system-settings.update');
     });
 
 Route::prefix('staff')
@@ -165,4 +308,17 @@ Route::prefix('staff')
         Route::patch('/blotter/{blotter}/reject', [BlottersController::class, 'reject'])
             ->middleware('permission:blotter.approve')
             ->name('blotter.reject');
+
+        Route::get('/upload-documents', [DocumentsController::class, 'uploadIndex'])
+            ->middleware('permission:documents.upload')
+            ->name('upload-documents');
+        Route::post('/upload-documents', [DocumentsController::class, 'store'])
+            ->middleware('permission:documents.upload')
+            ->name('upload-documents.store');
+        Route::get('/documents/{document}/download', [DocumentsController::class, 'download'])
+            ->middleware('permission:documents.upload')
+            ->name('documents.download');
+        Route::delete('/documents/{document}', [DocumentsController::class, 'destroy'])
+            ->middleware('permission:documents.upload')
+            ->name('documents.destroy');
     });

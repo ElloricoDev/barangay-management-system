@@ -21,6 +21,13 @@ class DatabaseSeeder extends Seeder
             ResidentSeeder::class,
             BlotterSeeder::class,
             CertificateSeeder::class,
+            SystemSettingSeeder::class,
+            DelegationSettingSeeder::class,
+            RolePermissionSeeder::class,
+            PaymentSeeder::class,
+            DocumentSeeder::class,
+            BarangayProgramSeeder::class,
+            AuditLogSeeder::class,
         ]);
     }
 }

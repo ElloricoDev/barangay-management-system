@@ -15,7 +15,7 @@ class AdminMiddleware
     {
         $user = $request->user();
 
-        if (! $user || ! $user->hasAnyRole(['captain', 'secretary', 'admin'])) {
+        if (! $user || ! $user->isAdminPanelRole()) {
             abort(403, 'Unauthorized access.');
         }
 

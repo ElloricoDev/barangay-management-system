@@ -58,8 +58,7 @@ class DashboardController extends Controller
 
         $recentPendingCertificates = Certificate::query()
             ->with('resident:id,first_name,last_name')
-            ->where('status', 'pending')
-            ->orWhere('status', 'ready_for_approval')
+            ->whereIn('status', ['submitted', 'ready_for_approval'])
             ->select(['id', 'resident_id', 'type', 'status', 'issue_date'])
             ->latest()
             ->limit(5)
