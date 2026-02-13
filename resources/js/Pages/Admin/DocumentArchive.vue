@@ -7,6 +7,7 @@ const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
 const permissions = computed(() => page.props.auth?.permissions ?? []);
 const canDelete = computed(() => permissions.value.includes("documents.delete"));
+const canApprove = computed(() => permissions.value.includes("documents.approve"));
 
 const props = defineProps({
     documents: {
@@ -15,7 +16,7 @@ const props = defineProps({
     },
     filters: {
         type: Object,
-        default: () => ({ search: "", module: "", sort: "created_at", direction: "desc" }),
+        default: () => ({ search: "", module: "", status: "", sort: "created_at", direction: "desc" }),
     },
 });
 
@@ -27,6 +28,7 @@ const search = computed({
             {
                 search: value,
                 module: props.filters?.module ?? "",
+                status: props.filters?.status ?? "",
                 sort: props.filters?.sort ?? "created_at",
                 direction: props.filters?.direction ?? "desc",
             },
@@ -43,6 +45,24 @@ const moduleFilter = computed({
             {
                 search: props.filters?.search ?? "",
                 module: value,
+                status: props.filters?.status ?? "",
+                sort: props.filters?.sort ?? "created_at",
+                direction: props.filters?.direction ?? "desc",
+            },
+            { preserveState: true, replace: true }
+        );
+    },
+});
+
+const statusFilter = computed({
+    get: () => props.filters?.status ?? "",
+    set: (value) => {
+        router.get(
+            "/admin/document-archive",
+            {
+                search: props.filters?.search ?? "",
+                module: props.filters?.module ?? "",
+                status: value,
                 sort: props.filters?.sort ?? "created_at",
                 direction: props.filters?.direction ?? "desc",
             },
@@ -60,6 +80,7 @@ const sortBy = (column) => {
         {
             search: props.filters?.search ?? "",
             module: props.filters?.module ?? "",
+            status: props.filters?.status ?? "",
             sort: column,
             direction: nextDirection,
         },
@@ -74,6 +95,9 @@ const sortIndicator = (column) => {
 
 const showDeleteModal = ref(false);
 const selectedDocument = ref(null);
+const showApprovalModal = ref(false);
+const approvalAction = ref("approve");
+const approvalReason = ref("");
 
 const openDeleteModal = (document) => {
     selectedDocument.value = document;
@@ -93,6 +117,31 @@ const confirmDelete = () => {
     });
 };
 
+const openApprovalModal = (document, action) => {
+    selectedDocument.value = document;
+    approvalAction.value = action;
+    approvalReason.value = "";
+    showApprovalModal.value = true;
+};
+
+const closeApprovalModal = () => {
+    showApprovalModal.value = false;
+    selectedDocument.value = null;
+    approvalReason.value = "";
+};
+
+const confirmApprovalAction = () => {
+    if (!selectedDocument.value) return;
+
+    const endpoint = approvalAction.value === "approve" ? "approve" : "reject";
+    const payload = approvalAction.value === "reject" ? { reason: approvalReason.value } : {};
+
+    router.patch(`/admin/documents/${selectedDocument.value.id}/${endpoint}`, payload, {
+        preserveScroll: true,
+        onSuccess: () => closeApprovalModal(),
+    });
+};
+
 const formatBytes = (value) => {
     const bytes = Number(value ?? 0);
     if (bytes < 1024) return `${bytes} B`;
@@ -109,6 +158,12 @@ const formatDate = (value) => {
         hour: "numeric",
         minute: "2-digit",
     });
+};
+
+const statusClasses = (status) => {
+    if (status === "approved") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    if (status === "rejected") return "bg-rose-50 text-rose-700 border-rose-200";
+    return "bg-amber-50 text-amber-700 border-amber-200";
 };
 </script>
 
@@ -151,6 +206,18 @@ const formatDate = (value) => {
                     <option value="other">Other</option>
                 </select>
             </div>
+            <div>
+                <label class="mb-1 block text-xs font-medium text-slate-600">Status</label>
+                <select
+                    v-model="statusFilter"
+                    class="w-44 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                >
+                    <option value="">All Statuses</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+            </div>
         </div>
 
         <div class="overflow-x-auto rounded-lg border border-slate-200">
@@ -164,6 +231,9 @@ const formatDate = (value) => {
                             <button type="button" @click="sortBy('module')">Module {{ sortIndicator("module") }}</button>
                         </th>
                         <th class="px-4 py-3 text-left font-semibold text-slate-600">Resident</th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">
+                            <button type="button" @click="sortBy('status')">Status {{ sortIndicator("status") }}</button>
+                        </th>
                         <th class="px-4 py-3 text-left font-semibold text-slate-600">
                             <button type="button" @click="sortBy('original_name')">File {{ sortIndicator("original_name") }}</button>
                         </th>
@@ -184,6 +254,14 @@ const formatDate = (value) => {
                         <td class="px-4 py-3 text-slate-700">
                             {{ document.resident ? `${document.resident.last_name}, ${document.resident.first_name}` : "-" }}
                         </td>
+                        <td class="px-4 py-3">
+                            <span
+                                class="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium"
+                                :class="statusClasses(document.status)"
+                            >
+                                {{ document.status ?? "submitted" }}
+                            </span>
+                        </td>
                         <td class="px-4 py-3 text-slate-700">{{ document.original_name }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ formatBytes(document.file_size) }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ formatDate(document.created_at) }}</td>
@@ -197,6 +275,22 @@ const formatDate = (value) => {
                                     Download
                                 </a>
                                 <button
+                                    v-if="canApprove && document.status !== 'approved'"
+                                    type="button"
+                                    class="rounded-md border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+                                    @click="openApprovalModal(document, 'approve')"
+                                >
+                                    Approve
+                                </button>
+                                <button
+                                    v-if="canApprove && document.status !== 'rejected'"
+                                    type="button"
+                                    class="rounded-md border border-amber-300 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50"
+                                    @click="openApprovalModal(document, 'reject')"
+                                >
+                                    Reject
+                                </button>
+                                <button
                                     v-if="canDelete"
                                     type="button"
                                     class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50"
@@ -208,7 +302,7 @@ const formatDate = (value) => {
                         </td>
                     </tr>
                     <tr v-if="props.documents.data.length === 0">
-                        <td colspan="8" class="px-4 py-6 text-center text-slate-500">No documents found.</td>
+                        <td colspan="9" class="px-4 py-6 text-center text-slate-500">No documents found.</td>
                     </tr>
                 </tbody>
             </table>
@@ -240,6 +334,40 @@ const formatDate = (value) => {
                     </button>
                     <button type="button" class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700" @click="confirmDelete">
                         Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showApprovalModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+                <h3 class="text-lg font-semibold text-slate-800">
+                    {{ approvalAction === "approve" ? "Approve Document" : "Reject Document" }}
+                </h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    {{ approvalAction === "approve" ? "Approve" : "Reject" }}
+                    <span class="font-medium">{{ selectedDocument?.original_name }}</span>?
+                </p>
+                <div v-if="approvalAction === 'reject'" class="mt-3">
+                    <label class="mb-1 block text-xs font-medium text-slate-600">Reason (optional)</label>
+                    <textarea
+                        v-model="approvalReason"
+                        rows="3"
+                        class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                        placeholder="Enter reason for rejection"
+                    />
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" @click="closeApprovalModal">
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-md px-4 py-2 text-sm font-medium text-white"
+                        :class="approvalAction === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'"
+                        @click="confirmApprovalAction"
+                    >
+                        {{ approvalAction === "approve" ? "Approve" : "Reject" }}
                     </button>
                 </div>
             </div>

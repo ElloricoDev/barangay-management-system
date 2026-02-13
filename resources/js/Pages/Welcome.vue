@@ -5,6 +5,7 @@ import { Head } from "@inertiajs/vue3";
 import { EnvelopeIcon, LockClosedIcon } from "@heroicons/vue/24/outline";
 
 const loading = ref(false);
+const errors = ref({});
 
 const form = reactive({
     email: "",
@@ -14,12 +15,19 @@ const form = reactive({
 
 const login = async () => {
     loading.value = true;
+    errors.value = {};
 
     try {
         await axios.post("/login", form);
         window.location.href = "/dashboard";
     } catch (error) {
-        alert("Invalid credentials");
+        if (error?.response?.status === 422) {
+            errors.value = error.response.data?.errors ?? {};
+        } else {
+            errors.value = {
+                email: ["Unable to login right now. Please try again."],
+            };
+        }
     } finally {
         loading.value = false;
     }
@@ -42,6 +50,13 @@ const login = async () => {
 
             <!-- Login Form -->
             <form @submit.prevent="login" class="space-y-5">
+                <div
+                    v-if="errors.email?.length"
+                    class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+                >
+                    {{ errors.email[0] }}
+                </div>
+
                 <!-- Email -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">

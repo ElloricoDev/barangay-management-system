@@ -50,6 +50,7 @@ return [
             'documents.upload',
             'documents.download',
             'documents.delete',
+            'documents.approve',
             'users.manage',
             'roles.manage',
             'audit.view',
@@ -79,7 +80,9 @@ return [
             'document_archive.view',
             'documents.upload',
             'documents.download',
+            'documents.delete',
             'reports.view',
+            'reports_analytics.view',
         ],
         'finance_officer' => [
             'dashboard.view',
@@ -110,7 +113,6 @@ return [
             'youth_programs.view',
             'youth_reports.view',
             'youth.manage',
-            'reports.view',
         ],
         'technical_administrator' => [
             'dashboard.view',

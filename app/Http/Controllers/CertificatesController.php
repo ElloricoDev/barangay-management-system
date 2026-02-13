@@ -63,6 +63,7 @@ class CertificatesController extends Controller
             'certificates' => $certificates,
             'residents' => Resident::query()
                 ->select(['id', 'first_name', 'last_name'])
+                ->whereNull('archived_at')
                 ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->limit(200)

@@ -41,6 +41,7 @@ class DocumentsController extends Controller
             'documents' => $documents,
             'residents' => Resident::query()
                 ->select(['id', 'first_name', 'last_name'])
+                ->whereNull('archived_at')
                 ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->limit(300)
@@ -88,6 +89,7 @@ class DocumentsController extends Controller
             'mime_type' => $file->getClientMimeType(),
             'file_size' => (int) $file->getSize(),
             'notes' => $validated['notes'] ?? null,
+            'status' => 'submitted',
         ]);
 
         AuditLogger::log(
@@ -100,6 +102,64 @@ class DocumentsController extends Controller
         );
 
         return redirect()->back()->with('success', 'Document uploaded successfully.');
+    }
+
+    public function approve(Request $request, Document $document)
+    {
+        if ($document->status === 'approved') {
+            return redirect()->back()->with('error', 'Document is already approved.');
+        }
+
+        $before = $document->only(['status', 'reviewed_by', 'reviewed_at', 'rejection_reason', 'updated_at']);
+
+        $document->update([
+            'status' => 'approved',
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => now(),
+            'rejection_reason' => null,
+        ]);
+
+        AuditLogger::log(
+            $request,
+            'document.approve',
+            Document::class,
+            $document->id,
+            $before,
+            $document->only(['status', 'reviewed_by', 'reviewed_at', 'rejection_reason', 'updated_at'])
+        );
+
+        return redirect()->back()->with('success', 'Document approved.');
+    }
+
+    public function reject(Request $request, Document $document)
+    {
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($document->status === 'rejected') {
+            return redirect()->back()->with('error', 'Document is already rejected.');
+        }
+
+        $before = $document->only(['status', 'reviewed_by', 'reviewed_at', 'rejection_reason', 'updated_at']);
+
+        $document->update([
+            'status' => 'rejected',
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => now(),
+            'rejection_reason' => $validated['reason'] ?? null,
+        ]);
+
+        AuditLogger::log(
+            $request,
+            'document.reject',
+            Document::class,
+            $document->id,
+            $before,
+            $document->only(['status', 'reviewed_by', 'reviewed_at', 'rejection_reason', 'updated_at'])
+        );
+
+        return redirect()->back()->with('success', 'Document rejected.');
     }
 
     public function download(Request $request, Document $document)
@@ -165,6 +225,7 @@ class DocumentsController extends Controller
         return [
             'search' => trim((string) $request->query('search', '')),
             'module' => trim((string) $request->query('module', '')),
+            'status' => trim((string) $request->query('status', '')),
             'sort' => trim((string) $request->query('sort', 'created_at')),
             'direction' => strtolower(trim((string) $request->query('direction', 'desc'))) === 'asc' ? 'asc' : 'desc',
         ];
@@ -172,13 +233,14 @@ class DocumentsController extends Controller
 
     private function queryDocuments(array $filters)
     {
-        $sortable = ['title', 'module', 'original_name', 'file_size', 'created_at'];
+        $sortable = ['title', 'module', 'status', 'original_name', 'file_size', 'created_at'];
         $sort = in_array($filters['sort'], $sortable, true) ? $filters['sort'] : 'created_at';
 
         return Document::query()
             ->with([
                 'resident:id,first_name,last_name',
                 'uploader:id,name',
+                'reviewer:id,name',
             ])
             ->when($filters['search'] !== '', function ($query) use ($filters) {
                 $search = $filters['search'];
@@ -186,6 +248,7 @@ class DocumentsController extends Controller
                     $inner->where('title', 'like', "%{$search}%")
                         ->orWhere('original_name', 'like', "%{$search}%")
                         ->orWhere('module', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
                         ->orWhereHas('resident', function ($residentQuery) use ($search) {
                             $residentQuery->where('first_name', 'like', "%{$search}%")
                                 ->orWhere('last_name', 'like', "%{$search}%");
@@ -194,6 +257,9 @@ class DocumentsController extends Controller
             })
             ->when($filters['module'] !== '', function ($query) use ($filters) {
                 $query->where('module', $filters['module']);
+            })
+            ->when($filters['status'] !== '', function ($query) use ($filters) {
+                $query->where('status', $filters['status']);
             })
             ->orderBy($sort, $filters['direction']);
     }

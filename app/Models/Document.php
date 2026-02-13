@@ -23,7 +23,18 @@ class Document extends Model
         'mime_type',
         'file_size',
         'notes',
+        'status',
+        'reviewed_by',
+        'reviewed_at',
+        'rejection_reason',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'reviewed_at' => 'datetime',
+        ];
+    }
 
     public function resident()
     {
@@ -43,5 +54,10 @@ class Document extends Model
     public function uploader()
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function reviewer()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
     }
 }

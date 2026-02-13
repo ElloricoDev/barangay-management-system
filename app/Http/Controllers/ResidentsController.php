@@ -25,6 +25,7 @@ class ResidentsController extends Controller
         }
 
         $residents = Resident::query()
+            ->whereNull('archived_at')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('first_name', 'like', "%{$search}%")

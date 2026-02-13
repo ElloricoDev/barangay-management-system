@@ -21,16 +21,10 @@ class RolePermission extends Model
         'permissions' => 'array',
     ];
 
-    private static array $cache = [];
-
     public static function permissionsForRole(string $role): ?array
     {
         if (! Schema::hasTable('role_permissions')) {
             return null;
-        }
-
-        if (array_key_exists($role, self::$cache)) {
-            return self::$cache[$role];
         }
 
         try {
@@ -39,19 +33,12 @@ class RolePermission extends Model
             return null;
         }
 
-        self::$cache[$role] = $record?->permissions;
-
-        return self::$cache[$role];
+        return $record?->permissions;
     }
 
     public static function forgetCache(?string $role = null): void
     {
-        if ($role === null) {
-            self::$cache = [];
-            return;
-        }
-
-        unset(self::$cache[$role]);
+        // Permission lookups are read directly from DB.
     }
 
     public function updater()

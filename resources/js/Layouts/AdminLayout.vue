@@ -130,6 +130,9 @@ const confirmLogout = () => {
                     <Link v-if="canManageRoles" href="/admin/role-permissions" class="block rounded-lg px-3 py-2 text-sm hover:bg-slate-800">
                         Role Permissions
                     </Link>
+                    <Link v-if="canManageRoles" href="/admin/access-matrix" class="block rounded-lg px-3 py-2 text-sm hover:bg-slate-800">
+                        Access Matrix
+                    </Link>
                     <Link v-if="canViewAudit" href="/admin/audit-logs" class="block rounded-lg px-3 py-2 text-sm hover:bg-slate-800">
                         Audit Logs
                     </Link>

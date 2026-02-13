@@ -2,6 +2,7 @@
 
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Models\RolePermission;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -15,6 +16,13 @@ it('updates system settings from admin settings screen', function () {
     $user = User::factory()->create([
         'role' => 'super_admin',
     ]);
+    RolePermission::query()->updateOrCreate(
+        ['role' => 'super_admin'],
+        [
+            'permissions' => ['dashboard.view', 'system.settings'],
+            'updated_by' => $user->id,
+        ]
+    );
 
     $response = $this->actingAs($user)->put('/admin/system-settings', [
         'barangay_name' => 'Barangay Test',

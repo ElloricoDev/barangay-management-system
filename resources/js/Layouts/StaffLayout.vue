@@ -22,6 +22,9 @@ const canViewCertificates = computed(() => permissions.value.includes("certifica
 const canViewBlotter = computed(() => permissions.value.includes("blotter.view"));
 const canUploadDocuments = computed(() => permissions.value.includes("documents.upload"));
 const canViewReports = computed(() => permissions.value.includes("reports.view"));
+const canValidateData = computed(() => permissions.value.includes("data.validate"));
+const canArchiveData = computed(() => permissions.value.includes("data.archive"));
+const canViewDataQuality = computed(() => canValidateData.value || canArchiveData.value);
 const showLogoutModal = ref(false);
 
 const confirmLogout = () => {
@@ -61,6 +64,9 @@ const confirmLogout = () => {
                     </Link>
                     <Link v-if="canViewReports" href="/staff/dashboard" class="block rounded-lg px-3 py-2 text-sm hover:bg-emerald-800">
                         Reports
+                    </Link>
+                    <Link v-if="canViewDataQuality" href="/staff/data-quality" class="block rounded-lg px-3 py-2 text-sm hover:bg-emerald-800">
+                        Data Quality
                     </Link>
                 </nav>
             </aside>

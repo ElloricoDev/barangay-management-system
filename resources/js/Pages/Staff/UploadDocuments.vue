@@ -25,7 +25,7 @@ const props = defineProps({
     },
     filters: {
         type: Object,
-        default: () => ({ search: "", module: "", sort: "created_at", direction: "desc" }),
+        default: () => ({ search: "", module: "", status: "", sort: "created_at", direction: "desc" }),
     },
 });
 
@@ -37,6 +37,7 @@ const search = computed({
             {
                 search: value,
                 module: props.filters?.module ?? "",
+                status: props.filters?.status ?? "",
                 sort: props.filters?.sort ?? "created_at",
                 direction: props.filters?.direction ?? "desc",
             },
@@ -53,6 +54,24 @@ const moduleFilter = computed({
             {
                 search: props.filters?.search ?? "",
                 module: value,
+                status: props.filters?.status ?? "",
+                sort: props.filters?.sort ?? "created_at",
+                direction: props.filters?.direction ?? "desc",
+            },
+            { preserveState: true, replace: true }
+        );
+    },
+});
+
+const statusFilter = computed({
+    get: () => props.filters?.status ?? "",
+    set: (value) => {
+        router.get(
+            "/staff/upload-documents",
+            {
+                search: props.filters?.search ?? "",
+                module: props.filters?.module ?? "",
+                status: value,
                 sort: props.filters?.sort ?? "created_at",
                 direction: props.filters?.direction ?? "desc",
             },
@@ -70,6 +89,7 @@ const sortBy = (column) => {
         {
             search: props.filters?.search ?? "",
             module: props.filters?.module ?? "",
+            status: props.filters?.status ?? "",
             sort: column,
             direction: nextDirection,
         },
@@ -143,6 +163,12 @@ const formatDate = (value) => {
         hour: "numeric",
         minute: "2-digit",
     });
+};
+
+const statusClasses = (status) => {
+    if (status === "approved") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    if (status === "rejected") return "bg-rose-50 text-rose-700 border-rose-200";
+    return "bg-amber-50 text-amber-700 border-amber-200";
 };
 </script>
 
@@ -243,6 +269,18 @@ const formatDate = (value) => {
                     <option value="other">Other</option>
                 </select>
             </div>
+            <div>
+                <label class="mb-1 block text-xs font-medium text-slate-600">Status</label>
+                <select
+                    v-model="statusFilter"
+                    class="w-44 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                >
+                    <option value="">All Statuses</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+            </div>
         </div>
 
         <div class="overflow-x-auto rounded-lg border border-slate-200">
@@ -254,6 +292,9 @@ const formatDate = (value) => {
                         </th>
                         <th class="px-4 py-3 text-left font-semibold text-slate-600">
                             <button type="button" @click="sortBy('module')">Module {{ sortIndicator("module") }}</button>
+                        </th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">
+                            <button type="button" @click="sortBy('status')">Status {{ sortIndicator("status") }}</button>
                         </th>
                         <th class="px-4 py-3 text-left font-semibold text-slate-600">
                             <button type="button" @click="sortBy('original_name')">File {{ sortIndicator("original_name") }}</button>
@@ -271,6 +312,14 @@ const formatDate = (value) => {
                     <tr v-for="document in props.documents.data" :key="document.id">
                         <td class="px-4 py-3 text-slate-700">{{ document.title }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ document.module ?? "-" }}</td>
+                        <td class="px-4 py-3">
+                            <span
+                                class="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium"
+                                :class="statusClasses(document.status)"
+                            >
+                                {{ document.status ?? "submitted" }}
+                            </span>
+                        </td>
                         <td class="px-4 py-3 text-slate-700">{{ document.original_name }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ formatBytes(document.file_size) }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ formatDate(document.created_at) }}</td>
@@ -293,7 +342,7 @@ const formatDate = (value) => {
                         </td>
                     </tr>
                     <tr v-if="props.documents.data.length === 0">
-                        <td colspan="6" class="px-4 py-6 text-center text-slate-500">No uploaded documents found.</td>
+                        <td colspan="7" class="px-4 py-6 text-center text-slate-500">No uploaded documents found.</td>
                     </tr>
                 </tbody>
             </table>

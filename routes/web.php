@@ -17,6 +17,8 @@ use App\Http\Controllers\ResidentsController;
 use App\Http\Controllers\CertificatesController;
 use App\Http\Controllers\BlottersController;
 use App\Http\Controllers\SystemSettingsController;
+use App\Http\Controllers\DataQualityController;
+use App\Http\Controllers\AccessMatrixController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -220,6 +222,12 @@ Route::prefix('admin')
         Route::get('/documents/{document}/download', [DocumentsController::class, 'download'])
             ->middleware('permission:documents.download')
             ->name('documents.download');
+        Route::patch('/documents/{document}/approve', [DocumentsController::class, 'approve'])
+            ->middleware('permission:documents.approve')
+            ->name('documents.approve');
+        Route::patch('/documents/{document}/reject', [DocumentsController::class, 'reject'])
+            ->middleware('permission:documents.approve')
+            ->name('documents.reject');
         Route::delete('/documents/{document}', [DocumentsController::class, 'destroy'])
             ->middleware('permission:documents.delete')
             ->name('documents.destroy');
@@ -233,6 +241,12 @@ Route::prefix('admin')
         Route::patch('/role-permissions/{role}/reset', [RolePermissionsController::class, 'reset'])
             ->middleware('permission:roles.manage')
             ->name('role-permissions.reset');
+        Route::get('/access-matrix', [AccessMatrixController::class, 'index'])
+            ->middleware('permission:roles.manage')
+            ->name('access-matrix');
+        Route::get('/access-matrix/export', [AccessMatrixController::class, 'exportCsv'])
+            ->middleware('permission:roles.manage')
+            ->name('access-matrix.export');
 
         Route::get('/system-logs', [SystemLogsController::class, 'index'])
             ->middleware('permission:system.logs.view')
@@ -331,4 +345,11 @@ Route::prefix('staff')
         Route::delete('/documents/{document}', [DocumentsController::class, 'destroy'])
             ->middleware('permission:documents.upload')
             ->name('documents.destroy');
+
+        Route::get('/data-quality', [DataQualityController::class, 'index'])
+            ->middleware('permission:data.validate')
+            ->name('data-quality');
+        Route::patch('/data-quality/residents/{resident}/archive', [DataQualityController::class, 'archive'])
+            ->middleware('permission:data.archive')
+            ->name('data-quality.archive');
     });

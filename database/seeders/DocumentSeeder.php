@@ -37,6 +37,10 @@ class DocumentSeeder extends Seeder
             $storedName = "seed-{$runKey}-{$i}-".Str::random(8).".{$ext}";
             $path = "documents/{$storedName}";
             $original = "document_{$i}.{$ext}";
+            $status = fake()->randomElement(['submitted', 'approved', 'rejected']);
+            $reviewedBy = $status === 'submitted' ? null : fake()->randomElement($uploaderIds);
+            $reviewedAt = $status === 'submitted' ? null : fake()->dateTimeBetween('-30 days', 'now');
+            $rejectionReason = $status === 'rejected' ? fake()->sentence(8) : null;
 
             $content = "Seeded document {$i}\nModule: {$module}\nGenerated: ".now()->toDateTimeString()."\n";
             $disk->put($path, $content);
@@ -55,6 +59,10 @@ class DocumentSeeder extends Seeder
                 'mime_type' => $ext === 'pdf' ? 'application/pdf' : 'text/plain',
                 'file_size' => $disk->size($path) ?? strlen($content),
                 'notes' => fake()->optional()->sentence(6),
+                'status' => $status,
+                'reviewed_by' => $reviewedBy,
+                'reviewed_at' => $reviewedAt,
+                'rejection_reason' => $rejectionReason,
             ]);
         }
     }

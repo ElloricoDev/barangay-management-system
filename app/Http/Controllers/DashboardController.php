@@ -16,7 +16,7 @@ class DashboardController extends Controller
     public function admin(Request $request): Response
     {
         $stats = [
-            'residents' => Resident::count(),
+            'residents' => Resident::query()->whereNull('archived_at')->count(),
             'certificates' => Certificate::count(),
             'blotters' => Blotter::count(),
             'users' => User::count(),
