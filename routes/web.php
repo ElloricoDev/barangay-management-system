@@ -28,7 +28,14 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 });
 
-Route::post('/login', [UsersController::class, 'login'])->name('login');
+Route::get('/login', function () {
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+
+    return Inertia::render('Welcome');
+})->name('login');
+Route::post('/login', [UsersController::class, 'login'])->name('login.attempt');
 Route::post('/logout', [UsersController::class, 'logout'])->middleware('auth')->name('logout');
 
 Route::middleware('auth')->get('/dashboard', function () {
