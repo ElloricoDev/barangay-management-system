@@ -19,7 +19,7 @@
     }
 
     .app-shell__sidebar {
-        @apply fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 text-slate-100 transition-transform duration-200 md:static md:translate-x-0;
+        @apply fixed inset-y-0 left-0 z-40 w-64 transform overflow-y-auto border-r border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 text-slate-100 transition-transform duration-200 md:static md:translate-x-0;
     }
 
     .app-shell__brand {
@@ -67,7 +67,7 @@
     }
 
     .app-shell__header-row {
-        @apply flex items-center justify-between px-4 py-3 md:px-6;
+        @apply flex flex-wrap items-center justify-between gap-2 px-4 py-3 md:px-6;
     }
 
     .app-shell__header-start {
@@ -75,7 +75,7 @@
     }
 
     .app-shell__header-end {
-        @apply flex items-center gap-2;
+        @apply flex flex-wrap items-center justify-end gap-2;
     }
 
     .app-shell__content {
@@ -87,7 +87,7 @@
     }
 
     .ui-section-header {
-        @apply mb-4 flex items-end justify-between gap-3 border-b border-slate-200 pb-4;
+        @apply mb-4 flex flex-col items-start justify-between gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end;
     }
 
     .ui-title {

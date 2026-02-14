@@ -72,7 +72,7 @@ const iconComponent = computed(() => iconMap[props.icon] ?? iconMap.default);
 </script>
 
 <template>
-    <div class="ui-section-header items-center">
+    <div class="ui-section-header sm:items-center">
         <div class="flex items-start gap-3">
             <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700">
                 <component :is="iconComponent" class="h-5 w-5" />
@@ -82,7 +82,7 @@ const iconComponent = computed(() => iconMap[props.icon] ?? iconMap.default);
                 <p v-if="subtitle" class="ui-subtitle">{{ subtitle }}</p>
             </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             <slot name="actions" />
         </div>
     </div>

@@ -167,7 +167,7 @@ const confirmLogout = () => {
                         </div>
 
                         <div class="app-shell__header-end">
-                            <span class="text-sm text-slate-600">Signed in as {{ userName }}</span>
+                            <span class="hidden text-sm text-slate-600 sm:inline">Signed in as {{ userName }}</span>
                             <Link v-if="showAccountLink" :href="accountHref" class="ui-btn ui-btn--ghost">
                                 <UserCircleIcon class="h-4 w-4" />
                                 <span>My Account</span>
