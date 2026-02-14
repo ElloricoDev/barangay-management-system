@@ -11,15 +11,35 @@
 
 @layer components {
     .app-shell {
-        @apply min-h-screen text-slate-800;
+        @apply h-screen overflow-hidden text-slate-800;
     }
 
     .app-shell__grid {
-        @apply flex min-h-screen;
+        @apply flex h-full overflow-hidden;
     }
 
     .app-shell__sidebar {
-        @apply fixed inset-y-0 left-0 z-40 w-64 transform overflow-y-auto border-r border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 text-slate-100 transition-transform duration-200 md:static md:translate-x-0;
+        @apply fixed inset-y-0 left-0 z-40 w-64 transform overflow-y-auto overscroll-contain border-r border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 text-slate-100 transition-transform duration-200 md:static md:translate-x-0;
+        scrollbar-width: thin;
+        scrollbar-color: rgb(71 85 105 / 0.95) rgb(15 23 42 / 0.35);
+    }
+
+    .app-shell__sidebar::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    .app-shell__sidebar::-webkit-scrollbar-track {
+        background: rgb(15 23 42 / 0.35);
+    }
+
+    .app-shell__sidebar::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgb(71 85 105), rgb(51 65 85));
+        border: 2px solid rgb(15 23 42 / 0.35);
+        border-radius: 999px;
+    }
+
+    .app-shell__sidebar::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, rgb(100 116 139), rgb(71 85 105));
     }
 
     .app-shell__brand {
@@ -59,7 +79,7 @@
     }
 
     .app-shell__main {
-        @apply flex min-w-0 flex-1 flex-col;
+        @apply flex min-w-0 flex-1 flex-col overflow-hidden;
     }
 
     .app-shell__header {
@@ -79,7 +99,7 @@
     }
 
     .app-shell__content {
-        @apply flex-1 p-4 md:p-6;
+        @apply flex-1 overflow-y-auto p-4 md:p-6;
     }
 
     .ui-card {

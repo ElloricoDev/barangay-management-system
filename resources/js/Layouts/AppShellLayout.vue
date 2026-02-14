@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { Link, router, usePage } from "@inertiajs/vue3";
 import {
     ArchiveBoxIcon,
@@ -65,9 +65,12 @@ const props = defineProps({
     },
 });
 
+let sidebarScrollTop = 0;
+
 const page = usePage();
 const isSidebarOpen = ref(false);
 const showLogoutModal = ref(false);
+const sidebarRef = ref(null);
 const barangayName = computed(() => page.props.systemSettings?.barangay_name ?? "Barangay Management System");
 
 const normalizedUrl = computed(() => {
@@ -114,14 +117,27 @@ const isActive = (href) => {
 const confirmLogout = () => {
     router.post("/logout");
 };
+
+const handleSidebarScroll = (event) => {
+    sidebarScrollTop = event.target?.scrollTop ?? 0;
+};
+
+onMounted(async () => {
+    await nextTick();
+    if (sidebarRef.value) {
+        sidebarRef.value.scrollTop = sidebarScrollTop;
+    }
+});
 </script>
 
 <template>
     <div class="app-shell">
         <div class="app-shell__grid">
             <aside
+                ref="sidebarRef"
                 class="app-shell__sidebar"
                 :class="isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
+                @scroll="handleSidebarScroll"
             >
                 <div class="app-shell__brand">
                     <p class="app-shell__barangay">{{ barangayName }}</p>
