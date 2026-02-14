@@ -36,7 +36,7 @@ const statusIcon = (status) => {
 </script>
 
 <template>
-    <div class="ui-table-wrap">
+    <div class="ui-table-wrap" data-persist-scroll data-scroll-key="blotter-table">
         <table class="ui-table">
             <thead>
                 <tr>

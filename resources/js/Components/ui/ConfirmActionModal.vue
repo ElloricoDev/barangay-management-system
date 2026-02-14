@@ -40,7 +40,7 @@ const iconClass = "h-4 w-4";
 
 <template>
     <div v-if="show" class="ui-modal-backdrop">
-        <div class="ui-modal">
+        <div class="ui-modal ui-modal--compact" data-persist-scroll data-scroll-key="confirm-action-modal">
             <h3 class="text-lg font-semibold text-slate-800">{{ title }}</h3>
             <p class="mt-2 text-sm text-slate-600">{{ message }}</p>
             <div class="mt-4 flex justify-end gap-2">

@@ -30,7 +30,7 @@ const emit = defineEmits(["sort"]);
 </script>
 
 <template>
-    <div class="ui-table-wrap">
+    <div class="ui-table-wrap" data-persist-scroll data-scroll-key="payment-table">
         <table class="ui-table">
             <thead>
                 <tr>

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { Link, router, usePage } from "@inertiajs/vue3";
 import {
     ArchiveBoxIcon,
@@ -65,7 +65,12 @@ const props = defineProps({
     },
 });
 
+const SIDEBAR_SCROLL_KEY = "app-shell:sidebar-scroll-top";
+const SCROLL_MEMORY_PREFIX = "app-shell:panel-scroll";
+const PANEL_SCROLL_SELECTOR = "[data-persist-scroll], .ui-table-wrap, .ui-modal";
 let sidebarScrollTop = 0;
+let removeFinishListener = null;
+let panelScrollCleanup = [];
 
 const page = usePage();
 const isSidebarOpen = ref(false);
@@ -118,15 +123,126 @@ const confirmLogout = () => {
     router.post("/logout");
 };
 
+const readSidebarScrollTop = () => {
+    if (typeof window === "undefined") return 0;
+    const raw = window.sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+};
+
+const writeSidebarScrollTop = (value) => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(value));
+};
+
+const clearSidebarScrollTop = () => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.removeItem(SIDEBAR_SCROLL_KEY);
+};
+
+const panelScrollKey = (element, index) => {
+    const customKey = element.dataset.scrollKey?.trim();
+    if (customKey) return `${SCROLL_MEMORY_PREFIX}:${normalizedUrl.value}:${customKey}`;
+    const signature = element.className?.toString().split(/\s+/).filter(Boolean).slice(0, 3).join(".") ?? "panel";
+    return `${SCROLL_MEMORY_PREFIX}:${normalizedUrl.value}:${signature}:${index}`;
+};
+
+const readPanelScrollState = (key) => {
+    if (typeof window === "undefined") return { top: 0, left: 0 };
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return { top: 0, left: 0 };
+    try {
+        const parsed = JSON.parse(raw);
+        const top = Number(parsed?.top);
+        const left = Number(parsed?.left);
+        return {
+            top: Number.isFinite(top) && top >= 0 ? top : 0,
+            left: Number.isFinite(left) && left >= 0 ? left : 0,
+        };
+    } catch {
+        return { top: 0, left: 0 };
+    }
+};
+
+const writePanelScrollState = (key, element) => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(
+        key,
+        JSON.stringify({
+            top: element.scrollTop ?? 0,
+            left: element.scrollLeft ?? 0,
+        }),
+    );
+};
+
+const clearPanelBindings = () => {
+    panelScrollCleanup.forEach((cleanup) => cleanup());
+    panelScrollCleanup = [];
+};
+
+const bindPersistentPanelScroll = async () => {
+    if (typeof window === "undefined") return;
+    await nextTick();
+    clearPanelBindings();
+    const panels = Array.from(document.querySelectorAll(PANEL_SCROLL_SELECTOR));
+
+    panels.forEach((panel, index) => {
+        const key = panelScrollKey(panel, index);
+        const state = readPanelScrollState(key);
+        panel.scrollTop = state.top;
+        panel.scrollLeft = state.left;
+
+        const onScroll = () => writePanelScrollState(key, panel);
+        panel.addEventListener("scroll", onScroll, { passive: true });
+        panelScrollCleanup.push(() => panel.removeEventListener("scroll", onScroll));
+    });
+};
+
+const clearPanelScrollTop = () => {
+    if (typeof window === "undefined") return;
+    const keys = [];
+    for (let i = 0; i < window.sessionStorage.length; i += 1) {
+        const key = window.sessionStorage.key(i);
+        if (key?.startsWith(SCROLL_MEMORY_PREFIX)) {
+            keys.push(key);
+        }
+    }
+    keys.forEach((key) => window.sessionStorage.removeItem(key));
+};
+
+const clearPersistedScroll = () => {
+    clearSidebarScrollTop();
+    clearPanelScrollTop();
+};
+
+const restoreSidebarScroll = async () => {
+    await nextTick();
+    if (!sidebarRef.value) return;
+    sidebarRef.value.scrollTop = sidebarScrollTop;
+};
+
 const handleSidebarScroll = (event) => {
     sidebarScrollTop = event.target?.scrollTop ?? 0;
+    writeSidebarScrollTop(sidebarScrollTop);
 };
 
 onMounted(async () => {
-    await nextTick();
-    if (sidebarRef.value) {
-        sidebarRef.value.scrollTop = sidebarScrollTop;
+    sidebarScrollTop = readSidebarScrollTop();
+    await restoreSidebarScroll();
+    await bindPersistentPanelScroll();
+    removeFinishListener = router.on("finish", async () => {
+        await restoreSidebarScroll();
+        await bindPersistentPanelScroll();
+    });
+    window.addEventListener("beforeunload", clearPersistedScroll);
+});
+
+onBeforeUnmount(() => {
+    if (typeof removeFinishListener === "function") {
+        removeFinishListener();
     }
+    clearPanelBindings();
+    window.removeEventListener("beforeunload", clearPersistedScroll);
 });
 </script>
 
@@ -206,7 +322,7 @@ onMounted(async () => {
         </div>
 
         <div v-if="showLogoutModal" class="ui-modal-backdrop">
-            <div class="ui-modal">
+            <div class="ui-modal ui-modal--compact" data-persist-scroll data-scroll-key="logout-modal">
                 <h3 class="text-lg font-semibold text-slate-800">Confirm Logout</h3>
                 <p class="mt-2 text-sm text-slate-600">Are you sure you want to logout?</p>
                 <div class="mt-4 flex justify-end gap-2">

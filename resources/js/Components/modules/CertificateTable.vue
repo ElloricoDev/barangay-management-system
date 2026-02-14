@@ -36,7 +36,7 @@ const statusLabel = (status) => String(status ?? "-").replace(/_/g, " ");
 </script>
 
 <template>
-    <div class="ui-table-wrap">
+    <div class="ui-table-wrap" data-persist-scroll data-scroll-key="certificate-table">
         <table class="ui-table">
             <thead>
                 <tr>
