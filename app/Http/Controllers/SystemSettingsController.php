@@ -28,6 +28,7 @@ class SystemSettingsController extends Controller
             'receipt_prefix' => ['required', 'string', 'max:20'],
             'timezone' => ['required', 'string', 'max:100'],
             'maintenance_mode' => ['boolean'],
+            'login_theme' => ['nullable', 'in:emerald,teal,blue,rose,amber'],
             'footer_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -41,12 +42,14 @@ class SystemSettingsController extends Controller
             'receipt_prefix',
             'timezone',
             'maintenance_mode',
+            'login_theme',
             'footer_note',
         ]);
 
         $settings->update([
             ...$validated,
             'maintenance_mode' => (bool) ($validated['maintenance_mode'] ?? false),
+            'login_theme' => $validated['login_theme'] ?? 'emerald',
             'updated_by' => $request->user()->id,
         ]);
 
@@ -65,6 +68,7 @@ class SystemSettingsController extends Controller
                 'receipt_prefix',
                 'timezone',
                 'maintenance_mode',
+                'login_theme',
                 'footer_note',
             ])
         );

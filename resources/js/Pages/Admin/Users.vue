@@ -1,7 +1,12 @@
 <script setup>
 import { computed, ref } from "vue";
-import { Link, router, useForm, usePage } from "@inertiajs/vue3";
+import { router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import { useListQuery } from "../../Composables/useListQuery";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
+import PaginationLinks from "../../Components/ui/PaginationLinks.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -36,40 +41,10 @@ const props = defineProps({
     },
 });
 
-const search = computed({
-    get: () => props.filters?.search ?? "",
-    set: (value) => {
-        router.get(
-            "/admin/users",
-            {
-                search: value,
-                sort: props.filters?.sort ?? "id",
-                direction: props.filters?.direction ?? "desc",
-            },
-            { preserveState: true, replace: true }
-        );
-    },
+const { search, sortBy, sortIndicator } = useListQuery({
+    path: "/admin/users",
+    filters: computed(() => props.filters),
 });
-
-const sortBy = (column) => {
-    const isCurrent = (props.filters?.sort ?? "id") === column;
-    const nextDirection = isCurrent && (props.filters?.direction ?? "desc") === "asc" ? "desc" : "asc";
-
-    router.get(
-        "/admin/users",
-        {
-            search: props.filters?.search ?? "",
-            sort: column,
-            direction: nextDirection,
-        },
-        { preserveState: true, replace: true }
-    );
-};
-
-const sortIndicator = (column) => {
-    if ((props.filters?.sort ?? "id") !== column) return "";
-    return (props.filters?.direction ?? "desc") === "asc" ? "^" : "v";
-};
 
 const createForm = useForm({
     name: "",
@@ -164,37 +139,38 @@ const confirmResetPassword = () => {
         }
     );
 };
+
+const deleteMessage = computed(() =>
+    selectedUser.value ? `Delete user ${selectedUser.value.name}?` : "Delete this user?"
+);
+const resetMessage = computed(() =>
+    selectedUser.value
+        ? `Reset password for ${selectedUser.value.name} to password123?`
+        : "Reset this user's password?"
+);
 </script>
 
 <template>
     <AdminLayout title="Users" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">Users Module</h2>
-                <p class="text-sm text-slate-500">Manage system user accounts and roles.</p>
-            </div>
+            <PageHeader title="Users Module" subtitle="Manage system user accounts and roles." icon="users" />
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {{ page.props.flash.success }}
-        </div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {{ page.props.flash.error }}
-        </div>
+        <FlashMessages :flash="page.props.flash" />
 
         <div class="mb-5 rounded-lg border border-slate-200 p-4">
             <h3 class="mb-3 font-semibold text-slate-800">Create User</h3>
             <div class="grid gap-3 md:grid-cols-4">
                 <div>
-                    <input v-model="createForm.name" type="text" placeholder="Name" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none" />
+                    <input v-model="createForm.name" type="text" placeholder="Name" class="ui-input" />
                     <p v-if="createForm.errors.name" class="mt-1 text-xs text-rose-600">{{ createForm.errors.name }}</p>
                 </div>
                 <div>
-                    <input v-model="createForm.email" type="email" placeholder="Email" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none" />
+                    <input v-model="createForm.email" type="email" placeholder="Email" class="ui-input" />
                     <p v-if="createForm.errors.email" class="mt-1 text-xs text-rose-600">{{ createForm.errors.email }}</p>
                 </div>
                 <div>
-                    <select v-model="createForm.role" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none">
+                    <select v-model="createForm.role" class="ui-input">
                         <option v-for="role in roleOptions" :key="role.value" :value="role.value">
                             {{ role.label }}
                         </option>
@@ -202,11 +178,11 @@ const confirmResetPassword = () => {
                     <p v-if="createForm.errors.role" class="mt-1 text-xs text-rose-600">{{ createForm.errors.role }}</p>
                 </div>
                 <div>
-                    <input v-model="createForm.password" type="password" placeholder="Password (min 8)" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none" />
+                    <input v-model="createForm.password" type="password" placeholder="Password (min 8)" class="ui-input" />
                     <p v-if="createForm.errors.password" class="mt-1 text-xs text-rose-600">{{ createForm.errors.password }}</p>
                 </div>
             </div>
-            <button type="button" class="mt-3 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" @click="submitCreate">
+            <button type="button" class="ui-btn ui-btn--primary mt-3 px-4 py-2 font-medium" @click="submitCreate">
                 Create User
             </button>
         </div>
@@ -217,13 +193,13 @@ const confirmResetPassword = () => {
                 v-model="search"
                 type="text"
                 placeholder="Search user..."
-                class="w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                class="ui-input max-w-xs"
             />
         </div>
 
-        <div class="overflow-x-auto rounded-lg border border-slate-200">
-            <table class="min-w-full divide-y divide-slate-200 text-sm">
-                <thead class="bg-slate-50">
+        <div class="ui-table-wrap">
+            <table class="ui-table">
+                <thead>
                     <tr>
                         <th class="px-4 py-3 text-left font-semibold text-slate-600">
                             <button type="button" @click="sortBy('name')">Name {{ sortIndicator("name") }}</button>
@@ -240,7 +216,7 @@ const confirmResetPassword = () => {
                         <th class="px-4 py-3 text-left font-semibold text-slate-600">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
+                <tbody>
                     <tr v-for="user in props.users.data" :key="user.id">
                         <td class="px-4 py-3 text-slate-700">{{ user.name }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ user.email }}</td>
@@ -277,34 +253,22 @@ const confirmResetPassword = () => {
             </table>
         </div>
 
-        <div class="mt-4 flex flex-wrap gap-2">
-            <Link
-                v-for="link in props.users.links"
-                :key="link.label"
-                :href="link.url || '#'"
-                class="rounded-md border px-3 py-1 text-sm"
-                :class="[
-                    link.active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700',
-                    !link.url ? 'pointer-events-none opacity-50' : '',
-                ]"
-                v-html="link.label"
-            />
-        </div>
+        <PaginationLinks :links="props.users.links" />
 
         <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
             <div class="w-full max-w-3xl rounded-lg bg-white p-5 shadow-xl">
                 <h3 class="mb-3 text-lg font-semibold text-slate-800">Edit User</h3>
                 <div class="grid gap-3 md:grid-cols-4">
                     <div>
-                        <input v-model="editForm.name" type="text" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none" />
+                        <input v-model="editForm.name" type="text" class="ui-input" />
                         <p v-if="editForm.errors.name" class="mt-1 text-xs text-rose-600">{{ editForm.errors.name }}</p>
                     </div>
                     <div>
-                        <input v-model="editForm.email" type="email" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none" />
+                        <input v-model="editForm.email" type="email" class="ui-input" />
                         <p v-if="editForm.errors.email" class="mt-1 text-xs text-rose-600">{{ editForm.errors.email }}</p>
                     </div>
                     <div>
-                        <select v-model="editForm.role" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none">
+                        <select v-model="editForm.role" class="ui-input">
                             <option v-for="role in roleOptions" :key="role.value" :value="role.value">
                                 {{ role.label }}
                             </option>
@@ -312,7 +276,7 @@ const confirmResetPassword = () => {
                         <p v-if="editForm.errors.role" class="mt-1 text-xs text-rose-600">{{ editForm.errors.role }}</p>
                     </div>
                     <div>
-                        <input v-model="editForm.password" type="password" placeholder="New password (optional)" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none" />
+                        <input v-model="editForm.password" type="password" placeholder="New password (optional)" class="ui-input" />
                         <p v-if="editForm.errors.password" class="mt-1 text-xs text-rose-600">{{ editForm.errors.password }}</p>
                     </div>
                 </div>
@@ -320,45 +284,30 @@ const confirmResetPassword = () => {
                     <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" @click="closeEditModal">
                         Cancel
                     </button>
-                    <button type="button" class="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" @click="submitEdit">
+                    <button type="button" class="ui-btn ui-btn--primary px-4 py-2 font-medium" @click="submitEdit">
                         Save Changes
                     </button>
                 </div>
             </div>
         </div>
 
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-                <h3 class="text-lg font-semibold text-slate-800">Confirm Delete</h3>
-                <p class="mt-2 text-sm text-slate-600">
-                    Delete user <span class="font-medium">{{ selectedUser?.name }}</span>?
-                </p>
-                <div class="mt-4 flex justify-end gap-2">
-                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" @click="closeDeleteModal">
-                        Cancel
-                    </button>
-                    <button type="button" class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700" @click="confirmDelete">
-                        Delete
-                    </button>
-                </div>
-            </div>
-        </div>
+        <ConfirmActionModal
+            :show="showDeleteModal"
+            title="Confirm Delete"
+            :message="deleteMessage"
+            confirm-label="Delete"
+            confirm-variant="danger"
+            @cancel="closeDeleteModal"
+            @confirm="confirmDelete"
+        />
 
-        <div v-if="showResetModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-                <h3 class="text-lg font-semibold text-slate-800">Reset Password</h3>
-                <p class="mt-2 text-sm text-slate-600">
-                    Reset password for <span class="font-medium">{{ selectedUser?.name }}</span> to <span class="font-medium">password123</span>?
-                </p>
-                <div class="mt-4 flex justify-end gap-2">
-                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" @click="closeResetModal">
-                        Cancel
-                    </button>
-                    <button type="button" class="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700" @click="confirmResetPassword">
-                        Reset
-                    </button>
-                </div>
-            </div>
-        </div>
+        <ConfirmActionModal
+            :show="showResetModal"
+            title="Reset Password"
+            :message="resetMessage"
+            confirm-label="Reset"
+            @cancel="closeResetModal"
+            @confirm="confirmResetPassword"
+        />
     </AdminLayout>
 </template>

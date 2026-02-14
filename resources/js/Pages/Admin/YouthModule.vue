@@ -2,6 +2,11 @@
 import { computed, ref } from "vue";
 import { Link, router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import { useListQuery } from "../../Composables/useListQuery";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import ModalDialog from "../../Components/ui/ModalDialog.vue";
+import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -32,43 +37,49 @@ const subtitle = {
     youth_programs: "Manage SK programs and events.",
     youth_reports: "Youth participation and program summaries.",
 };
+const headerIcon = computed(() => {
+    if (props.section === "youth_reports") return "reports";
+    if (props.section === "youth_programs") return "projects";
+    return "youth";
+});
+
+const residentsQuery = useListQuery({
+    path: "/admin/youth-residents",
+    filters: computed(() => props.filters),
+    defaultSort: "last_name",
+    defaultDirection: "asc",
+});
+const programsQuery = useListQuery({
+    path: "/admin/youth-programs",
+    filters: computed(() => props.filters),
+    defaultSort: "created_at",
+    buildParams: ({ search: nextSearch, sort, direction, filters }) => ({
+        search: nextSearch,
+        status: filters?.status ?? "",
+        sort,
+        direction,
+    }),
+});
 
 const sortBy = (column) => {
-    const isCurrent = (props.filters?.sort ?? "created_at") === column;
-    const nextDirection = isCurrent && (props.filters?.direction ?? "desc") === "asc" ? "desc" : "asc";
-    const base = props.section === "youth_residents" ? "/admin/youth-residents" : "/admin/youth-programs";
-    router.get(
-        base,
-        {
-            search: props.filters?.search ?? "",
-            status: props.filters?.status ?? "",
-            sort: column,
-            direction: nextDirection,
-        },
-        { preserveState: true, replace: true }
-    );
+    if (props.section === "youth_residents") {
+        residentsQuery.sortBy(column);
+        return;
+    }
+    programsQuery.sortBy(column);
 };
 
 const sortIndicator = (column) => {
-    if ((props.filters?.sort ?? "created_at") !== column) return "";
-    return (props.filters?.direction ?? "desc") === "asc" ? "^" : "v";
+    if (props.section === "youth_residents") return residentsQuery.sortIndicator(column);
+    return programsQuery.sortIndicator(column);
 };
 
 const searchYouthResidents = (value) => {
-    router.get("/admin/youth-residents", {
-        search: value,
-        sort: props.filters?.sort ?? "last_name",
-        direction: props.filters?.direction ?? "asc",
-    }, { preserveState: true, replace: true });
+    residentsQuery.search.value = value;
 };
 
 const searchYouthPrograms = (value) => {
-    router.get("/admin/youth-programs", {
-        search: value,
-        status: props.filters?.status ?? "",
-        sort: props.filters?.sort ?? "created_at",
-        direction: props.filters?.direction ?? "desc",
-    }, { preserveState: true, replace: true });
+    programsQuery.search.value = value;
 };
 
 const changeProgramStatusFilter = (value) => {
@@ -109,6 +120,7 @@ const editForm = useForm({
 });
 
 const submitCreate = () => {
+    if (!canManageYouth.value) return;
     createForm.post("/admin/youth-programs", {
         preserveScroll: true,
         onSuccess: () => createForm.reset(),
@@ -116,6 +128,7 @@ const submitCreate = () => {
 };
 
 const openEditModal = (program) => {
+    if (!canManageYouth.value) return;
     selectedProgram.value = program;
     editForm.title = program.title ?? "";
     editForm.description = program.description ?? "";
@@ -136,6 +149,7 @@ const closeEditModal = () => {
 };
 
 const submitEdit = () => {
+    if (!canManageYouth.value) return;
     if (!selectedProgram.value) return;
     editForm.put(`/admin/youth-programs/${selectedProgram.value.id}`, {
         preserveScroll: true,
@@ -144,6 +158,7 @@ const submitEdit = () => {
 };
 
 const openDeleteModal = (program) => {
+    if (!canManageYouth.value) return;
     selectedProgram.value = program;
     showDeleteModal.value = true;
 };
@@ -154,25 +169,26 @@ const closeDeleteModal = () => {
 };
 
 const confirmDelete = () => {
+    if (!canManageYouth.value) return;
     if (!selectedProgram.value) return;
     router.delete(`/admin/youth-programs/${selectedProgram.value.id}`, {
         preserveScroll: true,
         onSuccess: () => closeDeleteModal(),
     });
 };
+
+const deleteMessage = computed(() =>
+    selectedProgram.value ? `Delete ${selectedProgram.value.title}?` : "Delete selected program?"
+);
 </script>
 
 <template>
     <AdminLayout :title="titles[props.section]" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">{{ titles[props.section] }}</h2>
-                <p class="text-sm text-slate-500">{{ subtitle[props.section] }}</p>
-            </div>
+            <PageHeader :title="titles[props.section]" :subtitle="subtitle[props.section]" :icon="headerIcon" />
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ page.props.flash.success }}</div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ page.props.flash.error }}</div>
+        <FlashMessages :flash="page.props.flash" />
 
         <template v-if="props.section === 'youth_management'">
             <div class="grid gap-4 md:grid-cols-3">
@@ -228,18 +244,18 @@ const confirmDelete = () => {
             </div>
             <div class="overflow-x-auto rounded-lg border border-slate-200">
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('title')">Title {{ sortIndicator('title') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('status')">Status {{ sortIndicator('status') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('start_date')">Start {{ sortIndicator('start_date') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('participants')">Participants {{ sortIndicator('participants') }}</button></th><th class="px-4 py-3 text-left">Actions</th></tr></thead>
+                    <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('title')">Title {{ sortIndicator('title') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('status')">Status {{ sortIndicator('status') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('start_date')">Start {{ sortIndicator('start_date') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('participants')">Participants {{ sortIndicator('participants') }}</button></th><th v-if="canManageYouth" class="px-4 py-3 text-left">Actions</th></tr></thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
                         <tr v-for="program in props.youthPrograms.data" :key="program.id">
                             <td class="px-4 py-3">{{ program.title }}</td><td class="px-4 py-3">{{ program.status }}</td><td class="px-4 py-3">{{ program.start_date ?? '-' }}</td><td class="px-4 py-3">{{ program.participants }}</td>
-                            <td class="px-4 py-3">
-                                <div class="flex gap-2" v-if="canManageYouth">
+                            <td v-if="canManageYouth" class="px-4 py-3">
+                                <div class="flex gap-2">
                                     <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs" @click="openEditModal(program)">Edit</button>
                                     <button type="button" class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700" @click="openDeleteModal(program)">Delete</button>
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="props.youthPrograms.data.length === 0"><td colspan="5" class="px-4 py-6 text-center text-slate-500">No youth programs found.</td></tr>
+                        <tr v-if="props.youthPrograms.data.length === 0"><td :colspan="canManageYouth ? 5 : 4" class="px-4 py-6 text-center text-slate-500">No youth programs found.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -263,9 +279,7 @@ const confirmDelete = () => {
             </div>
         </template>
 
-        <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div class="w-full max-w-3xl rounded-lg bg-white p-5 shadow-xl">
-                <h3 class="mb-3 text-lg font-semibold text-slate-800">Edit Youth Program</h3>
+        <ModalDialog :show="showEditModal" title="Edit Youth Program" max-width-class="max-w-3xl" @close="closeEditModal">
                 <div class="grid gap-3 md:grid-cols-4">
                     <input v-model="editForm.title" type="text" class="rounded-md border border-slate-300 px-3 py-2 text-sm" />
                     <input v-model="editForm.committee" type="text" class="rounded-md border border-slate-300 px-3 py-2 text-sm" />
@@ -277,16 +291,17 @@ const confirmDelete = () => {
                     <input v-model="editForm.remarks" type="text" class="rounded-md border border-slate-300 px-3 py-2 text-sm" />
                     <textarea v-model="editForm.description" class="md:col-span-4 rounded-md border border-slate-300 px-3 py-2 text-sm"></textarea>
                 </div>
-                <div class="mt-4 flex justify-end gap-2"><button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" @click="closeEditModal">Cancel</button><button type="button" class="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white" @click="submitEdit">Save Changes</button></div>
-            </div>
-        </div>
+                <div class="mt-4 flex justify-end gap-2"><button type="button" class="ui-btn ui-btn--ghost px-4 py-2" @click="closeEditModal">Cancel</button><button type="button" class="ui-btn ui-btn--primary px-4 py-2 font-medium" @click="submitEdit">Save Changes</button></div>
+        </ModalDialog>
 
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-                <h3 class="text-lg font-semibold text-slate-800">Delete Program</h3>
-                <p class="mt-2 text-sm text-slate-600">Delete <span class="font-medium">{{ selectedProgram?.title }}</span>?</p>
-                <div class="mt-4 flex justify-end gap-2"><button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" @click="closeDeleteModal">Cancel</button><button type="button" class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white" @click="confirmDelete">Delete</button></div>
-            </div>
-        </div>
+        <ConfirmActionModal
+            :show="showDeleteModal"
+            title="Delete Program"
+            :message="deleteMessage"
+            confirm-label="Delete"
+            confirm-variant="danger"
+            @cancel="closeDeleteModal"
+            @confirm="confirmDelete"
+        />
     </AdminLayout>
 </template>

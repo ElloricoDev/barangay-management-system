@@ -2,6 +2,9 @@
 import { computed, ref } from "vue";
 import { useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -50,23 +53,17 @@ const submitDelete = () => {
         },
     });
 };
+
+const deleteMessage = "This will permanently delete your account. Continue?";
 </script>
 
 <template>
     <AdminLayout title="My Account" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">My Account</h2>
-                <p class="text-sm text-slate-500">Update your profile, change password, or delete your account.</p>
-            </div>
+            <PageHeader title="My Account" subtitle="Update your profile, change password, or delete your account." icon="account" />
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {{ page.props.flash.success }}
-        </div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {{ page.props.flash.error }}
-        </div>
+        <FlashMessages :flash="page.props.flash" />
 
         <div class="space-y-5">
             <section class="rounded-lg border border-slate-200 p-4">
@@ -121,29 +118,14 @@ const submitDelete = () => {
             </section>
         </div>
 
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-                <h3 class="text-lg font-semibold text-slate-800">Confirm Account Deletion</h3>
-                <p class="mt-2 text-sm text-slate-600">
-                    This will permanently delete your account. Continue?
-                </p>
-                <div class="mt-4 flex justify-end gap-2">
-                    <button
-                        type="button"
-                        class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
-                        @click="showDeleteModal = false"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
-                        @click="submitDelete"
-                    >
-                        Delete Account
-                    </button>
-                </div>
-            </div>
-        </div>
+        <ConfirmActionModal
+            :show="showDeleteModal"
+            title="Confirm Account Deletion"
+            :message="deleteMessage"
+            confirm-label="Delete Account"
+            confirm-variant="danger"
+            @cancel="showDeleteModal = false"
+            @confirm="submitDelete"
+        />
     </AdminLayout>
 </template>

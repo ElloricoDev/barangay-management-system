@@ -2,9 +2,18 @@
 import { computed, ref } from "vue";
 import { Link, router, useForm, usePage } from "@inertiajs/vue3";
 import StaffLayout from "../../Layouts/StaffLayout.vue";
+import { useListQuery } from "../../Composables/useListQuery";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Staff");
+const permissions = computed(() => page.props.auth?.permissions ?? []);
+const canUpload = computed(() => permissions.value.includes("documents.upload"));
+const canDelete = computed(
+    () => permissions.value.includes("documents.delete") || permissions.value.includes("documents.upload")
+);
 
 const props = defineProps({
     documents: {
@@ -29,21 +38,17 @@ const props = defineProps({
     },
 });
 
-const search = computed({
-    get: () => props.filters?.search ?? "",
-    set: (value) => {
-        router.get(
-            "/staff/upload-documents",
-            {
-                search: value,
-                module: props.filters?.module ?? "",
-                status: props.filters?.status ?? "",
-                sort: props.filters?.sort ?? "created_at",
-                direction: props.filters?.direction ?? "desc",
-            },
-            { preserveState: true, replace: true }
-        );
-    },
+const { search, sortBy, sortIndicator } = useListQuery({
+    path: "/staff/upload-documents",
+    filters: computed(() => props.filters),
+    defaultSort: "created_at",
+    buildParams: ({ search: nextSearch, sort, direction, filters }) => ({
+        search: nextSearch,
+        module: filters?.module ?? "",
+        status: filters?.status ?? "",
+        sort,
+        direction,
+    }),
 });
 
 const moduleFilter = computed({
@@ -80,28 +85,6 @@ const statusFilter = computed({
     },
 });
 
-const sortBy = (column) => {
-    const isCurrent = (props.filters?.sort ?? "created_at") === column;
-    const nextDirection = isCurrent && (props.filters?.direction ?? "desc") === "asc" ? "desc" : "asc";
-
-    router.get(
-        "/staff/upload-documents",
-        {
-            search: props.filters?.search ?? "",
-            module: props.filters?.module ?? "",
-            status: props.filters?.status ?? "",
-            sort: column,
-            direction: nextDirection,
-        },
-        { preserveState: true, replace: true }
-    );
-};
-
-const sortIndicator = (column) => {
-    if ((props.filters?.sort ?? "created_at") !== column) return "";
-    return (props.filters?.direction ?? "desc") === "asc" ? "^" : "v";
-};
-
 const uploadForm = useForm({
     title: "",
     module: "",
@@ -117,6 +100,7 @@ const onFileChange = (event) => {
 };
 
 const submitUpload = () => {
+    if (!canUpload.value) return;
     uploadForm.post("/staff/upload-documents", {
         preserveScroll: true,
         forceFormData: true,
@@ -130,6 +114,7 @@ const showDeleteModal = ref(false);
 const selectedDocument = ref(null);
 
 const openDeleteModal = (document) => {
+    if (!canDelete.value) return;
     selectedDocument.value = document;
     showDeleteModal.value = true;
 };
@@ -140,12 +125,19 @@ const closeDeleteModal = () => {
 };
 
 const confirmDelete = () => {
+    if (!canDelete.value) return;
     if (!selectedDocument.value) return;
     router.delete(`/staff/documents/${selectedDocument.value.id}`, {
         preserveScroll: true,
         onSuccess: () => closeDeleteModal(),
     });
 };
+
+const deleteMessage = computed(() =>
+    selectedDocument.value
+        ? `Delete ${selectedDocument.value.original_name}?`
+        : "Delete selected document?"
+);
 
 const formatBytes = (value) => {
     const bytes = Number(value ?? 0);
@@ -175,20 +167,12 @@ const statusClasses = (status) => {
 <template>
     <StaffLayout title="Upload Documents" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">Upload Documents</h2>
-                <p class="text-sm text-slate-500">Attach supporting files for records and requests.</p>
-            </div>
+            <PageHeader title="Upload Documents" subtitle="Attach supporting files for records and requests." icon="upload" />
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {{ page.props.flash.success }}
-        </div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {{ page.props.flash.error }}
-        </div>
+        <FlashMessages :flash="page.props.flash" />
 
-        <div class="mb-5 rounded-lg border border-slate-200 p-4">
+        <div v-if="canUpload" class="mb-5 rounded-lg border border-slate-200 p-4">
             <h3 class="mb-3 font-semibold text-slate-800">Upload New File</h3>
             <div class="grid gap-3 md:grid-cols-3">
                 <div>
@@ -332,6 +316,7 @@ const statusClasses = (status) => {
                                     Download
                                 </a>
                                 <button
+                                    v-if="canDelete"
                                     type="button"
                                     class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50"
                                     @click="openDeleteModal(document)"
@@ -362,21 +347,14 @@ const statusClasses = (status) => {
             />
         </div>
 
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-                <h3 class="text-lg font-semibold text-slate-800">Delete Document</h3>
-                <p class="mt-2 text-sm text-slate-600">
-                    Delete <span class="font-medium">{{ selectedDocument?.original_name }}</span>?
-                </p>
-                <div class="mt-4 flex justify-end gap-2">
-                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" @click="closeDeleteModal">
-                        Cancel
-                    </button>
-                    <button type="button" class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700" @click="confirmDelete">
-                        Delete
-                    </button>
-                </div>
-            </div>
-        </div>
+        <ConfirmActionModal
+            :show="showDeleteModal"
+            title="Delete Document"
+            :message="deleteMessage"
+            confirm-label="Delete"
+            confirm-variant="danger"
+            @cancel="closeDeleteModal"
+            @confirm="confirmDelete"
+        />
     </StaffLayout>
 </template>

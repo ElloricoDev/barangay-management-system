@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -54,8 +55,8 @@ const sidebarChecks = [
     { module: "Programs & Projects", permissions: ["programs.view"] },
     { module: "Committee Reports", permissions: ["committee_reports.view"] },
     { module: "Programs Monitoring", permissions: ["programs_monitoring.view"] },
-    { module: "Reports & Analytics", permissions: ["reports_analytics.view"] },
-    { module: "Reports", permissions: ["reports.view"] },
+    { module: "Analytics (Trends)", permissions: ["reports_analytics.view"] },
+    { module: "Reports (Export)", permissions: ["reports.view"] },
     { module: "Document Archive", permissions: ["document_archive.view"] },
     { module: "Upload Documents", permissions: ["documents.upload"] },
     { module: "Data Quality", permissions: ["data.validate", "data.archive"] },
@@ -82,18 +83,11 @@ const simulationResults = computed(() => {
 <template>
     <AdminLayout title="Access Matrix" :user-name="userName">
         <template #header>
-            <div class="mb-4 flex items-center justify-between border-b pb-4">
-                <div>
-                    <h2 class="text-xl font-semibold text-slate-800">Access Matrix</h2>
-                    <p class="text-sm text-slate-500">Review effective permission coverage per role.</p>
-                </div>
-                <a
-                    href="/admin/access-matrix/export"
-                    class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
-                >
-                    Export CSV
-                </a>
-            </div>
+            <PageHeader title="Access Matrix" subtitle="Review effective permission coverage per role." icon="matrix">
+                <template #actions>
+                    <a href="/admin/access-matrix/export" class="ui-btn ui-btn--ghost px-3 py-2">Export CSV</a>
+                </template>
+            </PageHeader>
         </template>
 
         <div class="grid gap-4 lg:grid-cols-[280px_1fr]">
@@ -134,7 +128,7 @@ const simulationResults = computed(() => {
                         v-model="search"
                         type="text"
                         placeholder="Filter permissions..."
-                        class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                        class="ui-input"
                     />
                 </div>
 

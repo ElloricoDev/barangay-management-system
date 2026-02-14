@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { Link, router, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -54,10 +55,7 @@ const formatDate = (value) => {
 <template>
     <AdminLayout title="System Logs" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">System Logs</h2>
-                <p class="text-sm text-slate-500">Audit activity and application log tail.</p>
-            </div>
+            <PageHeader title="System Logs" subtitle="Audit activity and application log tail." icon="logs" />
         </template>
 
         <form class="mb-4 grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-5" @submit.prevent="applyFilters">

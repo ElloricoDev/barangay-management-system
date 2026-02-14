@@ -16,32 +16,113 @@ class FinancialManagementController extends Controller
 {
     public function financialManagement(Request $request): Response
     {
-        return $this->renderSection($request, 'financial_management');
+        return Inertia::render('Admin/FinancialManagementOverview', [
+            'summary' => $this->buildSummary(''),
+            'recentPayments' => Payment::query()
+                ->with(['resident:id,first_name,last_name', 'collector:id,name'])
+                ->orderByDesc('paid_at')
+                ->limit(8)
+                ->get(),
+        ]);
     }
 
     public function paymentProcessing(Request $request): Response
     {
-        return $this->renderSection($request, 'payment_processing');
+        $filters = $this->extractFilters($request, 'paid_at');
+
+        return Inertia::render('Admin/PaymentProcessing', [
+            'filters' => $filters,
+            'payments' => $this->buildFilteredQuery($filters)
+                ->with(['resident:id,first_name,last_name', 'collector:id,name'])
+                ->paginate(10)
+                ->withQueryString(),
+            'residents' => Resident::query()
+                ->select(['id', 'first_name', 'last_name'])
+                ->orderBy('last_name')
+                ->orderBy('first_name')
+                ->limit(300)
+                ->get(),
+            'summary' => $this->buildSummary($filters['search']),
+        ]);
     }
 
     public function officialReceipts(Request $request): Response
     {
-        return $this->renderSection($request, 'official_receipts');
+        $filters = $this->extractFilters($request, 'or_number');
+
+        return Inertia::render('Admin/OfficialReceipts', [
+            'filters' => $filters,
+            'payments' => $this->buildFilteredQuery($filters)
+                ->with(['resident:id,first_name,last_name', 'collector:id,name'])
+                ->paginate(12)
+                ->withQueryString(),
+        ]);
     }
 
     public function collectionReports(Request $request): Response
     {
-        return $this->renderSection($request, 'collection_reports');
+        $filters = $this->extractFilters($request, 'paid_at');
+        $baseQuery = $this->applySearch(Payment::query(), $filters['search']);
+
+        $serviceTotals = (clone $baseQuery)
+            ->selectRaw('service_type, COUNT(*) as transactions_count, SUM(amount) as total_amount')
+            ->groupBy('service_type')
+            ->orderByDesc('total_amount')
+            ->get();
+
+        return Inertia::render('Admin/CollectionReports', [
+            'filters' => $filters,
+            'payments' => $this->buildFilteredQuery($filters)
+                ->with(['resident:id,first_name,last_name', 'collector:id,name'])
+                ->paginate(12)
+                ->withQueryString(),
+            'summary' => $this->buildSummary($filters['search']),
+            'serviceTotals' => $serviceTotals,
+        ]);
     }
 
     public function transactionHistory(Request $request): Response
     {
-        return $this->renderSection($request, 'transaction_history');
+        $filters = $this->extractFilters($request, 'paid_at');
+
+        return Inertia::render('Admin/TransactionHistory', [
+            'filters' => $filters,
+            'payments' => $this->buildFilteredQuery($filters)
+                ->with(['resident:id,first_name,last_name', 'collector:id,name'])
+                ->paginate(15)
+                ->withQueryString(),
+        ]);
     }
 
     public function financialSummary(Request $request): Response
     {
-        return $this->renderSection($request, 'financial_summary');
+        $serviceTotals = Payment::query()
+            ->selectRaw('service_type, COUNT(*) as transactions_count, SUM(amount) as total_amount')
+            ->groupBy('service_type')
+            ->orderByDesc('total_amount')
+            ->get();
+
+        $monthlyRows = Payment::query()
+            ->where('paid_at', '>=', now()->subMonths(5)->startOfMonth())
+            ->orderBy('paid_at')
+            ->get(['paid_at', 'amount']);
+
+        $monthlyTotals = $monthlyRows
+            ->groupBy(fn ($row) => optional($row->paid_at)->format('Y-m'))
+            ->map(function ($items, $month) {
+                return [
+                    'month' => $month,
+                    'total_amount' => (float) $items->sum('amount'),
+                    'transactions_count' => (int) $items->count(),
+                ];
+            })
+            ->values();
+
+        return Inertia::render('Admin/FinancialSummary', [
+            'summary' => $this->buildSummary(''),
+            'serviceTotals' => $serviceTotals,
+            'monthlyTotals' => $monthlyTotals,
+        ]);
     }
 
     public function exportCsv(Request $request): StreamedResponse
@@ -198,59 +279,28 @@ class FinancialManagementController extends Controller
         return redirect()->back()->with('success', 'Payment deleted successfully.');
     }
 
-    private function renderSection(Request $request, string $section): Response
+    private function buildSummary(string $search): array
     {
-        $filters = $this->extractFilters($request);
-        $search = $filters['search'];
+        $summaryQuery = $this->applySearch(Payment::query(), $search);
 
-        $payments = $this->buildFilteredQuery($request)
-            ->with([
-                'resident:id,first_name,last_name',
-                'collector:id,name',
-            ])
-            ->paginate(10)
-            ->withQueryString();
-
-        $summaryQuery = Payment::query();
-        if ($search !== '') {
-            $summaryQuery->where(function ($inner) use ($search) {
-                $inner->where('or_number', 'like', "%{$search}%")
-                    ->orWhere('service_type', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        $summary = [
+        return [
             'total_collections' => (float) $summaryQuery->sum('amount'),
             'transactions_count' => (int) $summaryQuery->count(),
             'today_collections' => (float) Payment::query()
                 ->whereDate('paid_at', now()->toDateString())
                 ->sum('amount'),
         ];
-
-        return Inertia::render('Admin/FinancialManagement', [
-            'activeSection' => $section,
-            'filters' => $filters,
-            'payments' => $payments,
-            'residents' => Resident::query()
-                ->select(['id', 'first_name', 'last_name'])
-                ->orderBy('last_name')
-                ->orderBy('first_name')
-                ->limit(300)
-                ->get(),
-            'summary' => $summary,
-        ]);
     }
 
-    private function extractFilters(Request $request): array
+    private function extractFilters(Request $request, string $defaultSort = 'paid_at'): array
     {
         $search = trim((string) $request->query('search', ''));
-        $sort = (string) $request->query('sort', 'paid_at');
+        $sort = (string) $request->query('sort', $defaultSort);
         $direction = strtolower((string) $request->query('direction', 'desc')) === 'asc' ? 'asc' : 'desc';
         $sortable = ['or_number', 'service_type', 'amount', 'paid_at', 'created_at', 'resident_name'];
 
         if (! in_array($sort, $sortable, true)) {
-            $sort = 'paid_at';
+            $sort = $defaultSort;
         }
 
         return [
@@ -260,25 +310,13 @@ class FinancialManagementController extends Controller
         ];
     }
 
-    private function buildFilteredQuery(Request $request)
+    private function buildFilteredQuery(array $filters)
     {
-        $filters = $this->extractFilters($request);
         $search = $filters['search'];
         $sort = $filters['sort'];
         $direction = $filters['direction'];
 
-        $query = Payment::query()
-            ->when($search !== '', function ($builder) use ($search) {
-                $builder->where(function ($inner) use ($search) {
-                    $inner->where('or_number', 'like', "%{$search}%")
-                        ->orWhere('service_type', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%")
-                        ->orWhereHas('resident', function ($resident) use ($search) {
-                            $resident->where('first_name', 'like', "%{$search}%")
-                                ->orWhere('last_name', 'like', "%{$search}%");
-                        });
-                });
-            });
+        $query = $this->applySearch(Payment::query(), $search);
 
         if ($sort === 'resident_name') {
             $query->leftJoin('residents', 'payments.resident_id', '=', 'residents.id')
@@ -290,5 +328,20 @@ class FinancialManagementController extends Controller
         }
 
         return $query;
+    }
+
+    private function applySearch($query, string $search)
+    {
+        return $query->when($search !== '', function ($builder) use ($search) {
+            $builder->where(function ($inner) use ($search) {
+                $inner->where('or_number', 'like', "%{$search}%")
+                    ->orWhere('service_type', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('resident', function ($resident) use ($search) {
+                        $resident->where('first_name', 'like', "%{$search}%")
+                            ->orWhere('last_name', 'like', "%{$search}%");
+                    });
+            });
+        });
     }
 }

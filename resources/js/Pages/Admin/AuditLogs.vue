@@ -2,6 +2,7 @@
 import { computed, reactive } from "vue";
 import { Link, router, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -128,10 +129,7 @@ const exportUrl = computed(() => {
 <template>
     <AdminLayout title="Audit Logs" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">Audit Logs</h2>
-                <p class="text-sm text-slate-500">Review approval history and sensitive system actions.</p>
-            </div>
+            <PageHeader title="Audit Logs" subtitle="Review approval history and sensitive system actions." icon="audit" />
         </template>
 
         <div class="mb-4 rounded-lg border border-slate-200 p-4">

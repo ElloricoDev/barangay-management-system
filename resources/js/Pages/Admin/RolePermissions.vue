@@ -2,6 +2,9 @@
 import { computed, ref, watch } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -121,18 +124,10 @@ const confirmResetAllRoles = () => {
 <template>
     <AdminLayout title="Role Permissions" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">Role Permissions</h2>
-                <p class="text-sm text-slate-500">Manage role-to-permission assignments from the UI.</p>
-            </div>
+            <PageHeader title="Role Permissions" subtitle="Manage role-to-permission assignments from the UI." icon="roles" />
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {{ page.props.flash.success }}
-        </div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {{ page.props.flash.error }}
-        </div>
+        <FlashMessages :flash="page.props.flash" />
 
         <div class="grid gap-4 lg:grid-cols-[260px_1fr]">
             <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -208,29 +203,14 @@ const confirmResetAllRoles = () => {
             </div>
         </div>
 
-        <div v-if="showResetAllModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-                <h3 class="text-lg font-semibold text-slate-800">Reset All Role Permissions</h3>
-                <p class="mt-2 text-sm text-slate-600">
-                    This will reset every role to the default permission matrix. Continue?
-                </p>
-                <div class="mt-4 flex justify-end gap-2">
-                    <button
-                        type="button"
-                        class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
-                        @click="closeResetAllModal"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
-                        @click="confirmResetAllRoles"
-                    >
-                        Reset All
-                    </button>
-                </div>
-            </div>
-        </div>
+        <ConfirmActionModal
+            :show="showResetAllModal"
+            title="Reset All Role Permissions"
+            message="This will reset every role to the default permission matrix. Continue?"
+            confirm-label="Reset All"
+            confirm-variant="danger"
+            @cancel="closeResetAllModal"
+            @confirm="confirmResetAllRoles"
+        />
     </AdminLayout>
 </template>

@@ -2,6 +2,8 @@
 import { computed } from "vue";
 import { useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -22,6 +24,7 @@ const form = useForm({
     receipt_prefix: props.settings.receipt_prefix ?? "OR",
     timezone: props.settings.timezone ?? "Asia/Manila",
     maintenance_mode: !!props.settings.maintenance_mode,
+    login_theme: props.settings.login_theme ?? "emerald",
     footer_note: props.settings.footer_note ?? "",
 });
 
@@ -35,14 +38,10 @@ const save = () => {
 <template>
     <AdminLayout title="System Settings" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">System Settings</h2>
-                <p class="text-sm text-slate-500">Manage global configuration and operational preferences.</p>
-            </div>
+            <PageHeader title="System Settings" subtitle="Manage global configuration and operational preferences." icon="settings" />
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ page.props.flash.success }}</div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ page.props.flash.error }}</div>
+        <FlashMessages :flash="page.props.flash" />
 
         <div class="grid gap-4 md:grid-cols-2">
             <div>
@@ -83,6 +82,17 @@ const save = () => {
             <div class="flex items-center gap-2 pt-6">
                 <input id="maintenance_mode" v-model="form.maintenance_mode" type="checkbox" class="h-4 w-4" />
                 <label for="maintenance_mode" class="text-sm font-medium text-slate-700">Enable Maintenance Mode</label>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-slate-700">Login Theme</label>
+                <select v-model="form.login_theme" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    <option value="emerald">Emerald</option>
+                    <option value="teal">Teal</option>
+                    <option value="blue">Blue</option>
+                    <option value="rose">Rose</option>
+                    <option value="amber">Amber</option>
+                </select>
+                <p v-if="form.errors.login_theme" class="mt-1 text-xs text-rose-600">{{ form.errors.login_theme }}</p>
             </div>
             <div class="md:col-span-2">
                 <label class="mb-1 block text-sm font-medium text-slate-700">Footer Note</label>

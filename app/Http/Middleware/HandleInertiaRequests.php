@@ -48,6 +48,8 @@ class HandleInertiaRequests extends Middleware
             'systemSettings' => fn () => [
                 'barangay_name' => $settings->barangay_name,
                 'maintenance_mode' => $settings->maintenance_mode,
+                'login_theme' => $settings->login_theme ?? 'emerald',
+                'footer_note' => $settings->footer_note,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

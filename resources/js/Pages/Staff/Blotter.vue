@@ -1,7 +1,13 @@
 <script setup>
 import { computed, ref } from "vue";
-import { Link, router, useForm, usePage } from "@inertiajs/vue3";
+import { router, useForm, usePage } from "@inertiajs/vue3";
 import StaffLayout from "../../Layouts/StaffLayout.vue";
+import { useListQuery } from "../../Composables/useListQuery";
+import BlotterTable from "../../Components/modules/BlotterTable.vue";
+import BlotterFormFields from "../../Components/modules/BlotterFormFields.vue";
+import PaginationLinks from "../../Components/ui/PaginationLinks.vue";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Staff");
@@ -26,40 +32,10 @@ const canApprove = computed(
     () => permissions.value.includes("blotter.approve") || props.delegation?.staff_can_approve
 );
 
-const search = computed({
-    get: () => props.filters?.search ?? "",
-    set: (value) => {
-        router.get(
-            "/staff/blotter",
-            {
-                search: value,
-                sort: props.filters?.sort ?? "id",
-                direction: props.filters?.direction ?? "desc",
-            },
-            { preserveState: true, replace: true }
-        );
-    },
+const { search, sortBy, sortIndicator } = useListQuery({
+    path: "/staff/blotter",
+    filters: computed(() => props.filters),
 });
-
-const sortBy = (column) => {
-    const isCurrent = (props.filters?.sort ?? "id") === column;
-    const nextDirection = isCurrent && (props.filters?.direction ?? "desc") === "asc" ? "desc" : "asc";
-
-    router.get(
-        "/staff/blotter",
-        {
-            search: props.filters?.search ?? "",
-            sort: column,
-            direction: nextDirection,
-        },
-        { preserveState: true, replace: true }
-    );
-};
-
-const sortIndicator = (column) => {
-    if ((props.filters?.sort ?? "id") !== column) return "";
-    return (props.filters?.direction ?? "desc") === "asc" ? "^" : "v";
-};
 
 const createForm = useForm({
     complainant_name: "",
@@ -127,166 +103,73 @@ const rejectBlotter = (blotter) => {
 <template>
     <StaffLayout title="Blotter Cases" :user-name="userName">
         <template #header>
-            <div class="mb-4 flex items-end justify-between gap-3 border-b pb-4">
-                <div>
-                    <h2 class="text-xl font-semibold text-slate-800">Blotter Module</h2>
-                    <p class="text-sm text-slate-500">Handle incident records and case progress.</p>
-                </div>
+            <PageHeader title="Blotter Module" subtitle="Handle incident records and case progress." icon="blotter">
+                <template #actions>
                 <input
                     v-model="search"
                     type="text"
                     placeholder="Search blotter..."
-                    class="w-full max-w-xs rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none"
+                    class="ui-input max-w-xs"
                 />
-            </div>
+                </template>
+            </PageHeader>
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {{ page.props.flash.success }}
-        </div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {{ page.props.flash.error }}
-        </div>
+        <FlashMessages :flash="page.props.flash" />
 
-        <div class="mb-5 rounded-lg border border-emerald-200 p-4">
+        <div class="mb-5 rounded-lg border border-slate-200 p-4">
             <h3 class="mb-3 font-semibold text-slate-800">Create Blotter Case</h3>
-            <div class="grid gap-3 md:grid-cols-2">
-                <div>
-                    <input v-model="createForm.complainant_name" type="text" placeholder="Complainant name" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none" />
-                    <p v-if="createForm.errors.complainant_name" class="mt-1 text-xs text-rose-600">{{ createForm.errors.complainant_name }}</p>
-                </div>
-                <div>
-                    <input v-model="createForm.respondent_name" type="text" placeholder="Respondent name" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none" />
-                    <p v-if="createForm.errors.respondent_name" class="mt-1 text-xs text-rose-600">{{ createForm.errors.respondent_name }}</p>
-                </div>
-                <div>
-                    <input v-model="createForm.incident_date" type="date" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none" />
-                    <p v-if="createForm.errors.incident_date" class="mt-1 text-xs text-rose-600">{{ createForm.errors.incident_date }}</p>
-                </div>
-                <div>
-                    <select v-model="createForm.status" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none">
-                        <option value="ongoing">ongoing</option>
-                        <option value="settled">settled</option>
-                    </select>
-                    <p v-if="createForm.errors.status" class="mt-1 text-xs text-rose-600">{{ createForm.errors.status }}</p>
-                </div>
-                <div class="md:col-span-2">
-                    <textarea v-model="createForm.description" rows="3" placeholder="Incident description" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none"></textarea>
-                    <p v-if="createForm.errors.description" class="mt-1 text-xs text-rose-600">{{ createForm.errors.description }}</p>
-                </div>
-            </div>
-            <button type="button" class="mt-3 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800" @click="submitCreate">
+            <BlotterFormFields :form="createForm" />
+            <button type="button" class="ui-btn ui-btn--primary mt-3 px-4 py-2 font-medium" @click="submitCreate">
                 Create Case
             </button>
         </div>
 
-        <div class="overflow-x-auto rounded-lg border border-emerald-200">
-            <table class="min-w-full divide-y divide-emerald-200 text-sm">
-                <thead class="bg-emerald-50">
-                    <tr>
-                        <th class="px-4 py-3 text-left font-semibold text-emerald-700">
-                            <button type="button" @click="sortBy('complainant_name')">Complainant {{ sortIndicator("complainant_name") }}</button>
-                        </th>
-                        <th class="px-4 py-3 text-left font-semibold text-emerald-700">
-                            <button type="button" @click="sortBy('respondent_name')">Respondent {{ sortIndicator("respondent_name") }}</button>
-                        </th>
-                        <th class="px-4 py-3 text-left font-semibold text-emerald-700">
-                            <button type="button" @click="sortBy('incident_date')">Incident Date {{ sortIndicator("incident_date") }}</button>
-                        </th>
-                        <th class="px-4 py-3 text-left font-semibold text-emerald-700">
-                            <button type="button" @click="sortBy('status')">Status {{ sortIndicator("status") }}</button>
-                        </th>
-                        <th class="px-4 py-3 text-left font-semibold text-emerald-700">Description</th>
-                        <th class="px-4 py-3 text-left font-semibold text-emerald-700">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-emerald-100 bg-white">
-                    <tr v-for="blotter in props.blotters.data" :key="blotter.id">
-                        <td class="px-4 py-3 text-slate-700">{{ blotter.complainant_name }}</td>
-                        <td class="px-4 py-3 text-slate-700">{{ blotter.respondent_name }}</td>
-                        <td class="px-4 py-3 text-slate-700">{{ blotter.incident_date }}</td>
-                        <td class="px-4 py-3 text-slate-700">{{ blotter.status }}</td>
-                        <td class="px-4 py-3 text-slate-700">{{ blotter.description }}</td>
-                        <td class="px-4 py-3">
-                            <div class="flex flex-wrap gap-2">
-                                <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100" @click="openEdit(blotter)">
-                                    Edit
-                                </button>
-                                <button
-                                    v-if="canApprove"
-                                    type="button"
-                                    class="rounded-md border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-                                    :disabled="blotter.status === 'settled'"
-                                    @click="approveBlotter(blotter)"
-                                >
-                                    Approve
-                                </button>
-                                <button
-                                    v-if="canApprove"
-                                    type="button"
-                                    class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-                                    :disabled="blotter.status === 'ongoing'"
-                                    @click="rejectBlotter(blotter)"
-                                >
-                                    Reject
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr v-if="props.blotters.data.length === 0">
-                        <td colspan="6" class="px-4 py-6 text-center text-slate-500">No blotter cases found.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <BlotterTable
+            :blotters="props.blotters.data"
+            :sort-indicator="sortIndicator"
+            :can-approve="canApprove"
+            :has-actions="true"
+            @sort="sortBy"
+        >
+            <template #actions="{ blotter }">
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="ui-btn ui-btn--ghost px-2 py-1 text-xs" @click="openEdit(blotter)">
+                        Edit
+                    </button>
+                    <button
+                        v-if="canApprove"
+                        type="button"
+                        class="rounded-md border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                        :disabled="blotter.status === 'settled'"
+                        @click="approveBlotter(blotter)"
+                    >
+                        Approve
+                    </button>
+                    <button
+                        v-if="canApprove"
+                        type="button"
+                        class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                        :disabled="blotter.status === 'ongoing'"
+                        @click="rejectBlotter(blotter)"
+                    >
+                        Reject
+                    </button>
+                </div>
+            </template>
+        </BlotterTable>
 
-        <div class="mt-4 flex flex-wrap gap-2">
-            <Link
-                v-for="link in props.blotters.links"
-                :key="link.label"
-                :href="link.url || '#'"
-                class="rounded-md border px-3 py-1 text-sm"
-                :class="[
-                    link.active ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-emerald-300 bg-white text-emerald-700',
-                    !link.url ? 'pointer-events-none opacity-50' : '',
-                ]"
-                v-html="link.label"
-            />
-        </div>
+        <PaginationLinks :links="props.blotters.links" />
 
-        <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <div v-if="showEditModal" class="ui-modal-backdrop">
             <div class="w-full max-w-3xl rounded-lg bg-white p-5 shadow-xl">
                 <h3 class="mb-3 text-lg font-semibold text-slate-800">Edit Blotter Case</h3>
-                <div class="grid gap-3 md:grid-cols-2">
-                    <div>
-                        <input v-model="editForm.complainant_name" type="text" placeholder="Complainant name" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none" />
-                        <p v-if="editForm.errors.complainant_name" class="mt-1 text-xs text-rose-600">{{ editForm.errors.complainant_name }}</p>
-                    </div>
-                    <div>
-                        <input v-model="editForm.respondent_name" type="text" placeholder="Respondent name" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none" />
-                        <p v-if="editForm.errors.respondent_name" class="mt-1 text-xs text-rose-600">{{ editForm.errors.respondent_name }}</p>
-                    </div>
-                    <div>
-                        <input v-model="editForm.incident_date" type="date" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none" />
-                        <p v-if="editForm.errors.incident_date" class="mt-1 text-xs text-rose-600">{{ editForm.errors.incident_date }}</p>
-                    </div>
-                    <div>
-                        <select v-model="editForm.status" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none">
-                            <option value="ongoing">ongoing</option>
-                            <option value="settled">settled</option>
-                        </select>
-                        <p v-if="editForm.errors.status" class="mt-1 text-xs text-rose-600">{{ editForm.errors.status }}</p>
-                    </div>
-                    <div class="md:col-span-2">
-                        <textarea v-model="editForm.description" rows="3" placeholder="Incident description" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none"></textarea>
-                        <p v-if="editForm.errors.description" class="mt-1 text-xs text-rose-600">{{ editForm.errors.description }}</p>
-                    </div>
-                </div>
+                <BlotterFormFields :form="editForm" />
                 <div class="mt-4 flex justify-end gap-2">
-                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" @click="closeEdit">
+                    <button type="button" class="ui-btn ui-btn--ghost px-4 py-2" @click="closeEdit">
                         Cancel
                     </button>
-                    <button type="button" class="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800" @click="submitEdit">
+                    <button type="button" class="ui-btn ui-btn--primary px-4 py-2 font-medium" @click="submitEdit">
                         Save
                     </button>
                 </div>
@@ -294,4 +177,3 @@ const rejectBlotter = (blotter) => {
         </div>
     </StaffLayout>
 </template>
-

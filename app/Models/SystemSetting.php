@@ -17,6 +17,7 @@ class SystemSetting extends Model
         'receipt_prefix',
         'timezone',
         'maintenance_mode',
+        'login_theme',
         'footer_note',
         'updated_by',
     ];
@@ -36,6 +37,7 @@ class SystemSetting extends Model
                 'timezone' => 'Asia/Manila',
                 'receipt_prefix' => 'OR',
                 'maintenance_mode' => false,
+                'login_theme' => 'emerald',
             ]);
         }
 
@@ -47,6 +49,7 @@ class SystemSetting extends Model
                     'timezone' => 'Asia/Manila',
                     'receipt_prefix' => 'OR',
                     'maintenance_mode' => false,
+                    'login_theme' => 'emerald',
                 ]
             );
         } catch (QueryException) {
@@ -55,6 +58,7 @@ class SystemSetting extends Model
                 'timezone' => 'Asia/Manila',
                 'receipt_prefix' => 'OR',
                 'maintenance_mode' => false,
+                'login_theme' => 'emerald',
             ]);
         }
     }

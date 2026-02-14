@@ -2,6 +2,9 @@
 import { computed, ref } from "vue";
 import { Link, router, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import { useListQuery } from "../../Composables/useListQuery";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -20,21 +23,17 @@ const props = defineProps({
     },
 });
 
-const search = computed({
-    get: () => props.filters?.search ?? "",
-    set: (value) => {
-        router.get(
-            "/admin/document-archive",
-            {
-                search: value,
-                module: props.filters?.module ?? "",
-                status: props.filters?.status ?? "",
-                sort: props.filters?.sort ?? "created_at",
-                direction: props.filters?.direction ?? "desc",
-            },
-            { preserveState: true, replace: true }
-        );
-    },
+const { search, sortBy, sortIndicator } = useListQuery({
+    path: "/admin/document-archive",
+    filters: computed(() => props.filters),
+    defaultSort: "created_at",
+    buildParams: ({ search: nextSearch, sort, direction, filters }) => ({
+        search: nextSearch,
+        module: filters?.module ?? "",
+        status: filters?.status ?? "",
+        sort,
+        direction,
+    }),
 });
 
 const moduleFilter = computed({
@@ -71,28 +70,6 @@ const statusFilter = computed({
     },
 });
 
-const sortBy = (column) => {
-    const isCurrent = (props.filters?.sort ?? "created_at") === column;
-    const nextDirection = isCurrent && (props.filters?.direction ?? "desc") === "asc" ? "desc" : "asc";
-
-    router.get(
-        "/admin/document-archive",
-        {
-            search: props.filters?.search ?? "",
-            module: props.filters?.module ?? "",
-            status: props.filters?.status ?? "",
-            sort: column,
-            direction: nextDirection,
-        },
-        { preserveState: true, replace: true }
-    );
-};
-
-const sortIndicator = (column) => {
-    if ((props.filters?.sort ?? "created_at") !== column) return "";
-    return (props.filters?.direction ?? "desc") === "asc" ? "^" : "v";
-};
-
 const showDeleteModal = ref(false);
 const selectedDocument = ref(null);
 const showApprovalModal = ref(false);
@@ -100,6 +77,7 @@ const approvalAction = ref("approve");
 const approvalReason = ref("");
 
 const openDeleteModal = (document) => {
+    if (!canDelete.value) return;
     selectedDocument.value = document;
     showDeleteModal.value = true;
 };
@@ -110,6 +88,7 @@ const closeDeleteModal = () => {
 };
 
 const confirmDelete = () => {
+    if (!canDelete.value) return;
     if (!selectedDocument.value) return;
     router.delete(`/admin/documents/${selectedDocument.value.id}`, {
         preserveScroll: true,
@@ -118,6 +97,7 @@ const confirmDelete = () => {
 };
 
 const openApprovalModal = (document, action) => {
+    if (!canApprove.value) return;
     selectedDocument.value = document;
     approvalAction.value = action;
     approvalReason.value = "";
@@ -131,6 +111,7 @@ const closeApprovalModal = () => {
 };
 
 const confirmApprovalAction = () => {
+    if (!canApprove.value) return;
     if (!selectedDocument.value) return;
 
     const endpoint = approvalAction.value === "approve" ? "approve" : "reject";
@@ -170,18 +151,10 @@ const statusClasses = (status) => {
 <template>
     <AdminLayout title="Document Archive" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">Document Archive</h2>
-                <p class="text-sm text-slate-500">Central archive for uploaded supporting files.</p>
-            </div>
+            <PageHeader title="Document Archive" subtitle="Central archive for uploaded supporting files." icon="archive" />
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {{ page.props.flash.success }}
-        </div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {{ page.props.flash.error }}
-        </div>
+        <FlashMessages :flash="page.props.flash" />
 
         <div class="mb-4 flex flex-wrap items-end gap-3">
             <div>

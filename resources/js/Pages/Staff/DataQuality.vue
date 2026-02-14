@@ -1,7 +1,10 @@
 <script setup>
 import { computed, ref } from "vue";
-import { Link, router, usePage } from "@inertiajs/vue3";
+import { router, usePage } from "@inertiajs/vue3";
 import StaffLayout from "../../Layouts/StaffLayout.vue";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import PaginationLinks from "../../Components/ui/PaginationLinks.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Staff");
@@ -100,18 +103,10 @@ const formatDate = (value) => {
 <template>
     <StaffLayout title="Data Quality" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">Data Quality</h2>
-                <p class="text-sm text-slate-500">Detect duplicate residents and archive outdated records.</p>
-            </div>
+            <PageHeader title="Data Quality" subtitle="Detect duplicate residents and archive outdated records." icon="quality" />
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {{ page.props.flash.success }}
-        </div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {{ page.props.flash.error }}
-        </div>
+        <FlashMessages :flash="page.props.flash" />
 
         <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
             <h3 class="text-sm font-semibold text-amber-900">Potential Duplicate Residents</h3>
@@ -202,19 +197,7 @@ const formatDate = (value) => {
             </table>
         </div>
 
-        <div class="mt-4 flex flex-wrap gap-2">
-            <Link
-                v-for="link in props.residents.links"
-                :key="link.label"
-                :href="link.url || '#'"
-                class="rounded-md border px-3 py-1 text-sm"
-                :class="[
-                    link.active ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-700',
-                    !link.url ? 'pointer-events-none opacity-50' : '',
-                ]"
-                v-html="link.label"
-            />
-        </div>
+        <PaginationLinks :links="props.residents.links" />
 
         <div v-if="showArchiveModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
             <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
@@ -253,4 +236,3 @@ const formatDate = (value) => {
         </div>
     </StaffLayout>
 </template>
-

@@ -18,24 +18,18 @@ class ReportsController extends Controller
 {
     public function reports(Request $request): Response
     {
-        return Inertia::render('Admin/ReportsAnalytics', [
-            'section' => 'reports',
-            ...$this->data($request),
-        ]);
+        return Inertia::render('Admin/Reports', $this->reportsData($request));
     }
 
     public function analytics(Request $request): Response
     {
-        return Inertia::render('Admin/ReportsAnalytics', [
-            'section' => 'analytics',
-            ...$this->data($request),
-        ]);
+        return Inertia::render('Admin/ReportsAnalytics', $this->analyticsData($request));
     }
 
     public function exportCsv(Request $request): StreamedResponse
     {
-        $data = $this->data($request);
-        $filename = 'reports-analytics-'.now()->format('Ymd-His').'.csv';
+        $data = $this->reportsData($request);
+        $filename = 'reports-'.now()->format('Ymd-His').'.csv';
 
         return response()->streamDownload(function () use ($data) {
             $handle = fopen('php://output', 'w');
@@ -51,17 +45,6 @@ class ReportsController extends Controller
             fputcsv($handle, ['Audit Events Range', $data['kpis']['audit_events_range'] ?? 0]);
 
             fputcsv($handle, []);
-            fputcsv($handle, ['Timeline', 'Residents', 'Certificates', 'Collections']);
-            foreach ($data['timeline'] as $row) {
-                fputcsv($handle, [
-                    $row['period'] ?? '',
-                    $row['residents'] ?? 0,
-                    $row['certificates'] ?? 0,
-                    $row['collections'] ?? 0,
-                ]);
-            }
-
-            fputcsv($handle, []);
             fputcsv($handle, ['Top Service Type', 'Transactions', 'Amount']);
             foreach ($data['topServices'] as $row) {
                 fputcsv($handle, [
@@ -71,24 +54,54 @@ class ReportsController extends Controller
                 ]);
             }
 
+            fputcsv($handle, []);
+            fputcsv($handle, ['Recent Activity', 'User', 'Action', 'Module']);
+            foreach ($data['recentActivity'] as $row) {
+                fputcsv($handle, [
+                    $row['created_at'] ?? '',
+                    data_get($row, 'user.name', 'System'),
+                    $row['action'] ?? '',
+                    class_basename((string) ($row['auditable_type'] ?? '')),
+                ]);
+            }
+
             fclose($handle);
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
-    private function data(Request $request): array
+    private function reportsData(Request $request): array
     {
-        $dateFrom = $request->query('date_from')
-            ? Carbon::parse((string) $request->query('date_from'))->startOfDay()
-            : now()->subMonths(11)->startOfMonth();
-        $dateTo = $request->query('date_to')
-            ? Carbon::parse((string) $request->query('date_to'))->endOfDay()
-            : now()->endOfDay();
+        [$dateFrom, $dateTo] = $this->dateRange($request);
 
-        if ($dateFrom->gt($dateTo)) {
-            [$dateFrom, $dateTo] = [$dateTo->copy()->startOfDay(), $dateFrom->copy()->endOfDay()];
-        }
+        return [
+            'filters' => [
+                'date_from' => $dateFrom->toDateString(),
+                'date_to' => $dateTo->toDateString(),
+            ],
+            'kpis' => $this->kpis($dateFrom, $dateTo),
+            'recentActivity' => AuditLog::query()
+                ->with('user:id,name,email')
+                ->whereBetween('created_at', [$dateFrom, $dateTo])
+                ->latest()
+                ->limit(20)
+                ->get(),
+            'topServices' => Payment::query()
+                ->select('service_type')
+                ->selectRaw('COUNT(*) as transactions')
+                ->selectRaw('SUM(amount) as amount')
+                ->whereBetween('paid_at', [$dateFrom, $dateTo])
+                ->groupBy('service_type')
+                ->orderByDesc('amount')
+                ->limit(10)
+                ->get(),
+        ];
+    }
+
+    private function analyticsData(Request $request): array
+    {
+        [$dateFrom, $dateTo] = $this->dateRange($request);
 
         $periodLabels = collect();
         $cursor = $dateFrom->copy()->startOfMonth();
@@ -119,61 +132,61 @@ class ReportsController extends Controller
             ->groupBy('period')
             ->pluck('total', 'period');
 
-        $timeline = $periodLabels->map(function ($period) use ($residentCounts, $certificateCounts, $paymentSums) {
-            return [
-                'period' => $period,
-                'residents' => (int) ($residentCounts[$period] ?? 0),
-                'certificates' => (int) ($certificateCounts[$period] ?? 0),
-                'collections' => (float) ($paymentSums[$period] ?? 0),
-            ];
-        })->values();
-
-        $certificateStatus = Certificate::query()
-            ->select('status')
-            ->selectRaw('COUNT(*) as total')
-            ->groupBy('status')
-            ->orderBy('status')
-            ->get();
-
-        $blotterStatus = Blotter::query()
-            ->select('status')
-            ->selectRaw('COUNT(*) as total')
-            ->groupBy('status')
-            ->orderBy('status')
-            ->get();
-
         return [
             'filters' => [
                 'date_from' => $dateFrom->toDateString(),
                 'date_to' => $dateTo->toDateString(),
             ],
-            'kpis' => [
-                'residents' => Resident::count(),
-                'certificates' => Certificate::count(),
-                'blotters' => Blotter::count(),
-                'users' => User::count(),
-                'collections_total' => (float) Payment::sum('amount'),
-                'collections_range' => (float) Payment::whereBetween('paid_at', [$dateFrom, $dateTo])->sum('amount'),
-                'audit_events_range' => (int) AuditLog::whereBetween('created_at', [$dateFrom, $dateTo])->count(),
-            ],
-            'timeline' => $timeline,
-            'certificateStatus' => $certificateStatus,
-            'blotterStatus' => $blotterStatus,
-            'recentActivity' => AuditLog::query()
-                ->with('user:id,name,email')
-                ->whereBetween('created_at', [$dateFrom, $dateTo])
-                ->latest()
-                ->limit(20)
+            'kpis' => $this->kpis($dateFrom, $dateTo),
+            'timeline' => $periodLabels->map(function ($period) use ($residentCounts, $certificateCounts, $paymentSums) {
+                return [
+                    'period' => $period,
+                    'residents' => (int) ($residentCounts[$period] ?? 0),
+                    'certificates' => (int) ($certificateCounts[$period] ?? 0),
+                    'collections' => (float) ($paymentSums[$period] ?? 0),
+                ];
+            })->values(),
+            'certificateStatus' => Certificate::query()
+                ->select('status')
+                ->selectRaw('COUNT(*) as total')
+                ->groupBy('status')
+                ->orderBy('status')
                 ->get(),
-            'topServices' => Payment::query()
-                ->select('service_type')
-                ->selectRaw('COUNT(*) as transactions')
-                ->selectRaw('SUM(amount) as amount')
-                ->whereBetween('paid_at', [$dateFrom, $dateTo])
-                ->groupBy('service_type')
-                ->orderByDesc('amount')
-                ->limit(10)
+            'blotterStatus' => Blotter::query()
+                ->select('status')
+                ->selectRaw('COUNT(*) as total')
+                ->groupBy('status')
+                ->orderBy('status')
                 ->get(),
+        ];
+    }
+
+    private function dateRange(Request $request): array
+    {
+        $dateFrom = $request->query('date_from')
+            ? Carbon::parse((string) $request->query('date_from'))->startOfDay()
+            : now()->subMonths(11)->startOfMonth();
+        $dateTo = $request->query('date_to')
+            ? Carbon::parse((string) $request->query('date_to'))->endOfDay()
+            : now()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            [$dateFrom, $dateTo] = [$dateTo->copy()->startOfDay(), $dateFrom->copy()->endOfDay()];
+        }
+
+        return [$dateFrom, $dateTo];
+    }
+
+    private function kpis(Carbon $dateFrom, Carbon $dateTo): array
+    {
+        return [
+            'residents' => Resident::count(),
+            'certificates' => Certificate::count(),
+            'blotters' => Blotter::count(),
+            'users' => User::count(),
+            'collections_total' => (float) Payment::sum('amount'),
+            'collections_range' => (float) Payment::whereBetween('paid_at', [$dateFrom, $dateTo])->sum('amount'),
+            'audit_events_range' => (int) AuditLog::whereBetween('created_at', [$dateFrom, $dateTo])->count(),
         ];
     }
 }

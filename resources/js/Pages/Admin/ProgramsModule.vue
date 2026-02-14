@@ -2,6 +2,11 @@
 import { computed, ref } from "vue";
 import { Link, router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
+import { useListQuery } from "../../Composables/useListQuery";
+import FlashMessages from "../../Components/ui/FlashMessages.vue";
+import ModalDialog from "../../Components/ui/ModalDialog.vue";
+import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
+import PageHeader from "../../Components/ui/PageHeader.vue";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -21,32 +26,29 @@ const titles = {
     committee_reports: "Committee Reports",
     programs_monitoring: "Programs Monitoring",
 };
+const headerIcon = computed(() => {
+    if (props.section === "committee_reports") return "reports";
+    if (props.section === "programs_monitoring") return "analytics";
+    return "projects";
+});
 
-const sortBy = (column) => {
-    const isCurrent = (props.filters?.sort ?? "created_at") === column;
-    const nextDirection = isCurrent && (props.filters?.direction ?? "desc") === "asc" ? "desc" : "asc";
-    const base = props.section === "programs_monitoring" ? "/admin/programs-monitoring" : "/admin/programs-projects";
-    router.get(base, {
-        search: props.filters?.search ?? "",
-        status: props.filters?.status ?? "",
-        sort: column,
-        direction: nextDirection,
-    }, { preserveState: true, replace: true });
-};
-
-const sortIndicator = (column) => {
-    if ((props.filters?.sort ?? "created_at") !== column) return "";
-    return (props.filters?.direction ?? "desc") === "asc" ? "^" : "v";
-};
+const listPath = computed(() =>
+    props.section === "programs_monitoring" ? "/admin/programs-monitoring" : "/admin/programs-projects"
+);
+const { search, sortBy, sortIndicator } = useListQuery({
+    path: listPath,
+    filters: computed(() => props.filters),
+    defaultSort: "created_at",
+    buildParams: ({ search: nextSearch, sort, direction, filters }) => ({
+        search: nextSearch,
+        status: filters?.status ?? "",
+        sort,
+        direction,
+    }),
+});
 
 const searchPrograms = (value) => {
-    const base = props.section === "programs_monitoring" ? "/admin/programs-monitoring" : "/admin/programs-projects";
-    router.get(base, {
-        search: value,
-        status: props.filters?.status ?? "",
-        sort: props.filters?.sort ?? "created_at",
-        direction: props.filters?.direction ?? "desc",
-    }, { preserveState: true, replace: true });
+    search.value = value;
 };
 
 const changeStatusFilter = (value) => {
@@ -88,10 +90,12 @@ const showDeleteModal = ref(false);
 const selectedProgram = ref(null);
 
 const submitCreate = () => {
+    if (!canManagePrograms.value) return;
     createForm.post("/admin/programs-projects", { preserveScroll: true, onSuccess: () => createForm.reset() });
 };
 
 const openEditModal = (program) => {
+    if (!canManagePrograms.value) return;
     selectedProgram.value = program;
     editForm.title = program.title ?? "";
     editForm.description = program.description ?? "";
@@ -111,11 +115,13 @@ const closeEditModal = () => {
 };
 
 const submitEdit = () => {
+    if (!canManagePrograms.value) return;
     if (!selectedProgram.value) return;
     editForm.put(`/admin/programs-projects/${selectedProgram.value.id}`, { preserveScroll: true, onSuccess: () => closeEditModal() });
 };
 
 const openDeleteModal = (program) => {
+    if (!canManagePrograms.value) return;
     selectedProgram.value = program;
     showDeleteModal.value = true;
 };
@@ -126,21 +132,23 @@ const closeDeleteModal = () => {
 };
 
 const confirmDelete = () => {
+    if (!canManagePrograms.value) return;
     if (!selectedProgram.value) return;
     router.delete(`/admin/programs-projects/${selectedProgram.value.id}`, { preserveScroll: true, onSuccess: () => closeDeleteModal() });
 };
+
+const deleteMessage = computed(() =>
+    selectedProgram.value ? `Delete ${selectedProgram.value.title}?` : "Delete selected program?"
+);
 </script>
 
 <template>
     <AdminLayout :title="titles[props.section]" :user-name="userName">
         <template #header>
-            <div class="mb-4 border-b pb-4">
-                <h2 class="text-xl font-semibold text-slate-800">{{ titles[props.section] }}</h2>
-            </div>
+            <PageHeader :title="titles[props.section]" :icon="headerIcon" />
         </template>
 
-        <div v-if="page.props.flash?.success" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ page.props.flash.success }}</div>
-        <div v-if="page.props.flash?.error" class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ page.props.flash.error }}</div>
+        <FlashMessages :flash="page.props.flash" />
 
         <template v-if="props.section === 'programs_projects'">
             <div v-if="canManagePrograms" class="mb-4 rounded-lg border border-slate-200 p-4">
@@ -167,10 +175,10 @@ const confirmDelete = () => {
             </div>
             <div class="overflow-x-auto rounded-lg border border-slate-200">
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('title')">Title {{ sortIndicator('title') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('committee')">Committee {{ sortIndicator('committee') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('status')">Status {{ sortIndicator('status') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('start_date')">Start {{ sortIndicator('start_date') }}</button></th><th class="px-4 py-3 text-left">Actions</th></tr></thead>
+                    <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('title')">Title {{ sortIndicator('title') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('committee')">Committee {{ sortIndicator('committee') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('status')">Status {{ sortIndicator('status') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('start_date')">Start {{ sortIndicator('start_date') }}</button></th><th v-if="canManagePrograms" class="px-4 py-3 text-left">Actions</th></tr></thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
-                        <tr v-for="program in props.programs.data" :key="program.id"><td class="px-4 py-3">{{ program.title }}</td><td class="px-4 py-3">{{ program.committee ?? '-' }}</td><td class="px-4 py-3">{{ program.status }}</td><td class="px-4 py-3">{{ program.start_date ?? '-' }}</td><td class="px-4 py-3"><div class="flex gap-2" v-if="canManagePrograms"><button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs" @click="openEditModal(program)">Edit</button><button type="button" class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700" @click="openDeleteModal(program)">Delete</button></div></td></tr>
-                        <tr v-if="props.programs.data.length === 0"><td colspan="5" class="px-4 py-6 text-center text-slate-500">No programs found.</td></tr>
+                        <tr v-for="program in props.programs.data" :key="program.id"><td class="px-4 py-3">{{ program.title }}</td><td class="px-4 py-3">{{ program.committee ?? '-' }}</td><td class="px-4 py-3">{{ program.status }}</td><td class="px-4 py-3">{{ program.start_date ?? '-' }}</td><td v-if="canManagePrograms" class="px-4 py-3"><div class="flex gap-2"><button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs" @click="openEditModal(program)">Edit</button><button type="button" class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700" @click="openDeleteModal(program)">Delete</button></div></td></tr>
+                        <tr v-if="props.programs.data.length === 0"><td :colspan="canManagePrograms ? 5 : 4" class="px-4 py-6 text-center text-slate-500">No programs found.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -208,9 +216,7 @@ const confirmDelete = () => {
             <div class="mt-4 flex flex-wrap gap-2"><Link v-for="link in props.monitoring.links" :key="link.label" :href="link.url || '#'" class="rounded-md border px-3 py-1 text-sm" :class="[link.active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700', !link.url ? 'pointer-events-none opacity-50' : '']" v-html="link.label" /></div>
         </template>
 
-        <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div class="w-full max-w-3xl rounded-lg bg-white p-5 shadow-xl">
-                <h3 class="mb-3 text-lg font-semibold text-slate-800">Edit Program / Project</h3>
+        <ModalDialog :show="showEditModal" title="Edit Program / Project" max-width-class="max-w-3xl" @close="closeEditModal">
                 <div class="grid gap-3 md:grid-cols-4">
                     <input v-model="editForm.title" type="text" class="rounded-md border border-slate-300 px-3 py-2 text-sm" />
                     <input v-model="editForm.committee" type="text" class="rounded-md border border-slate-300 px-3 py-2 text-sm" />
@@ -222,16 +228,17 @@ const confirmDelete = () => {
                     <input v-model="editForm.remarks" type="text" class="rounded-md border border-slate-300 px-3 py-2 text-sm" />
                     <textarea v-model="editForm.description" class="md:col-span-4 rounded-md border border-slate-300 px-3 py-2 text-sm"></textarea>
                 </div>
-                <div class="mt-4 flex justify-end gap-2"><button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" @click="closeEditModal">Cancel</button><button type="button" class="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white" @click="submitEdit">Save Changes</button></div>
-            </div>
-        </div>
+                <div class="mt-4 flex justify-end gap-2"><button type="button" class="ui-btn ui-btn--ghost px-4 py-2" @click="closeEditModal">Cancel</button><button type="button" class="ui-btn ui-btn--primary px-4 py-2 font-medium" @click="submitEdit">Save Changes</button></div>
+        </ModalDialog>
 
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-                <h3 class="text-lg font-semibold text-slate-800">Delete Program</h3>
-                <p class="mt-2 text-sm text-slate-600">Delete <span class="font-medium">{{ selectedProgram?.title }}</span>?</p>
-                <div class="mt-4 flex justify-end gap-2"><button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm" @click="closeDeleteModal">Cancel</button><button type="button" class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white" @click="confirmDelete">Delete</button></div>
-            </div>
-        </div>
+        <ConfirmActionModal
+            :show="showDeleteModal"
+            title="Delete Program"
+            :message="deleteMessage"
+            confirm-label="Delete"
+            confirm-variant="danger"
+            @cancel="closeDeleteModal"
+            @confirm="confirmDelete"
+        />
     </AdminLayout>
 </template>
