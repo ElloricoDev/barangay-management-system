@@ -11,6 +11,7 @@ class DisbursementRequest extends Model
 
     protected $fillable = [
         'budget_allocation_id',
+        'request_document_id',
         'request_reference',
         'expense_type',
         'purpose',
@@ -24,6 +25,7 @@ class DisbursementRequest extends Model
         'rejected_at',
         'released_payment_id',
         'voucher_number',
+        'voucher_document_id',
         'remarks',
         'rejection_reason',
     ];
@@ -61,5 +63,15 @@ class DisbursementRequest extends Model
     public function releasedPayment()
     {
         return $this->belongsTo(Payment::class, 'released_payment_id');
+    }
+
+    public function requestDocument()
+    {
+        return $this->belongsTo(Document::class, 'request_document_id');
+    }
+
+    public function voucherDocument()
+    {
+        return $this->belongsTo(Document::class, 'voucher_document_id');
     }
 }

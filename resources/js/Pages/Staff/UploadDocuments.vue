@@ -185,6 +185,7 @@ const statusClasses = (status) => {
                         <option value="resident">Resident</option>
                         <option value="certificate">Certificate</option>
                         <option value="blotter">Blotter</option>
+                        <option value="financial">Financial</option>
                         <option value="other">Other</option>
                     </select>
                     <p v-if="uploadForm.errors.module" class="mt-1 text-xs text-rose-600">{{ uploadForm.errors.module }}</p>
@@ -250,6 +251,7 @@ const statusClasses = (status) => {
                     <option value="resident">Resident</option>
                     <option value="certificate">Certificate</option>
                     <option value="blotter">Blotter</option>
+                    <option value="financial">Financial</option>
                     <option value="other">Other</option>
                 </select>
             </div>

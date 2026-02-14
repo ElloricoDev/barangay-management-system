@@ -38,6 +38,12 @@ const moduleMap = {
     disbursement: "Disbursement",
     statements: "Statements",
     statement: "Statement",
+    submissions: "Submissions",
+    submission: "Submission",
+    coa: "COA",
+    dbm: "DBM",
+    external: "External",
+    auditor: "Auditor",
 };
 
 const actionMap = {
@@ -58,6 +64,7 @@ const actionMap = {
     manage: "Manage",
     record: "Record",
     toggle: "Toggle",
+    acknowledge: "Acknowledge",
 };
 
 const toWords = (value) =>

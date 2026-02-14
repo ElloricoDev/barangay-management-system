@@ -25,6 +25,7 @@ const props = defineProps({
     residents: { type: Array, default: () => [] },
     disbursementRequests: { type: Array, default: () => [] },
     budgetAllocations: { type: Array, default: () => [] },
+    financeDocuments: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({ search: "", sort: "paid_at", direction: "desc" }) },
 });
 
@@ -75,6 +76,7 @@ const showReleaseDisbursementModal = ref(false);
 
 const disbursementForm = useForm({
     budget_allocation_id: "",
+    request_document_id: "",
     request_reference: "",
     expense_type: "administrative",
     purpose: "",
@@ -89,6 +91,7 @@ const releaseDisbursementForm = useForm({
     or_number: "",
     description: "",
     voucher_number: "",
+    voucher_document_id: "",
     paid_at: "",
     notes: "",
 });
@@ -165,7 +168,7 @@ const submitDisbursementRequest = () => {
     if (!canRequestDisbursement.value) return;
     disbursementForm.post("/admin/disbursement-requests", {
         preserveScroll: true,
-        onSuccess: () => disbursementForm.reset("budget_allocation_id", "request_reference", "purpose", "amount", "voucher_number", "remarks"),
+        onSuccess: () => disbursementForm.reset("budget_allocation_id", "request_document_id", "request_reference", "purpose", "amount", "voucher_number", "remarks"),
     });
 };
 
@@ -200,6 +203,7 @@ const openReleaseDisbursementModal = (request) => {
     releaseDisbursementForm.or_number = "";
     releaseDisbursementForm.description = request.purpose ?? "";
     releaseDisbursementForm.voucher_number = request.voucher_number ?? "";
+    releaseDisbursementForm.voucher_document_id = request.voucher_document_id ?? "";
     releaseDisbursementForm.paid_at = "";
     releaseDisbursementForm.notes = request.remarks ?? "";
     showReleaseDisbursementModal.value = true;
@@ -230,6 +234,7 @@ const pretty = (value) =>
     String(value ?? "-")
         .replace(/_/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase());
+const documentLabel = (document) => `#${document.id} - ${document.title} (${pretty(document.module ?? "other")})`;
 const statusClass = (status) => {
     if (status === "approved") return "bg-emerald-50 text-emerald-700 border-emerald-200";
     if (status === "rejected") return "bg-rose-50 text-rose-700 border-rose-200";
@@ -267,6 +272,15 @@ const statusClass = (status) => {
                         </option>
                     </select>
                     <p v-if="disbursementForm.errors.budget_allocation_id" class="mt-1 text-xs text-rose-600">{{ disbursementForm.errors.budget_allocation_id }}</p>
+                </div>
+                <div>
+                    <select v-model="disbursementForm.request_document_id" class="ui-input">
+                        <option value="">Supporting Document (required)</option>
+                        <option v-for="document in props.financeDocuments" :key="document.id" :value="document.id">
+                            {{ documentLabel(document) }}
+                        </option>
+                    </select>
+                    <p v-if="disbursementForm.errors.request_document_id" class="mt-1 text-xs text-rose-600">{{ disbursementForm.errors.request_document_id }}</p>
                 </div>
                 <div>
                     <select v-model="disbursementForm.expense_type" class="ui-input">
@@ -318,6 +332,7 @@ const statusClass = (status) => {
                             <th>Requested By</th>
                             <th>Requested At</th>
                             <th>Approved At</th>
+                            <th>Documents</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -341,6 +356,18 @@ const statusClass = (status) => {
                             <td>{{ item.requester?.name ?? "-" }}</td>
                             <td>{{ formatDate(item.requested_at) }}</td>
                             <td>{{ formatDate(item.approved_at) }}</td>
+                            <td>
+                                <div class="space-y-1 text-xs text-slate-600">
+                                    <p>
+                                        Req:
+                                        <span class="font-medium text-slate-700">{{ item.request_document?.title ?? "-" }}</span>
+                                    </p>
+                                    <p>
+                                        Voucher:
+                                        <span class="font-medium text-slate-700">{{ item.voucher_document?.title ?? "-" }}</span>
+                                    </p>
+                                </div>
+                            </td>
                             <td>
                                 <div class="flex flex-wrap gap-2">
                                     <button
@@ -374,7 +401,7 @@ const statusClass = (status) => {
                             </td>
                         </tr>
                         <tr v-if="props.disbursementRequests.length === 0">
-                            <td colspan="10" class="px-4 py-6 text-center text-slate-500">No disbursement requests found.</td>
+                            <td colspan="11" class="px-4 py-6 text-center text-slate-500">No disbursement requests found.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -415,6 +442,15 @@ const statusClass = (status) => {
                 <div>
                     <input v-model="releaseDisbursementForm.or_number" type="text" class="ui-input" placeholder="OR Number (required)" />
                     <p v-if="releaseDisbursementForm.errors.or_number" class="mt-1 text-xs text-rose-600">{{ releaseDisbursementForm.errors.or_number }}</p>
+                </div>
+                <div>
+                    <select v-model="releaseDisbursementForm.voucher_document_id" class="ui-input">
+                        <option value="">Voucher Document (required)</option>
+                        <option v-for="document in props.financeDocuments" :key="document.id" :value="document.id">
+                            {{ documentLabel(document) }}
+                        </option>
+                    </select>
+                    <p v-if="releaseDisbursementForm.errors.voucher_document_id" class="mt-1 text-xs text-rose-600">{{ releaseDisbursementForm.errors.voucher_document_id }}</p>
                 </div>
                 <div>
                     <input v-model="releaseDisbursementForm.voucher_number" type="text" class="ui-input" placeholder="Voucher No. (optional)" />

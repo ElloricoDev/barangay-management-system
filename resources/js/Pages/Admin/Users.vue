@@ -23,6 +23,7 @@ const roleOptions = [
     { value: "data_manager", label: "Data Manager (Records Officer)" },
     { value: "encoder", label: "Encoder (Data Entry Personnel)" },
     { value: "technical_administrator", label: "Technical Administrator (IT/System Admin)" },
+    { value: "external_auditor", label: "External Auditor (COA/DBM Reviewer)" },
 ];
 
 const roleLabelMap = roleOptions.reduce((acc, role) => {

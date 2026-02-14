@@ -59,6 +59,15 @@ class UserSeeder extends Seeder
         );
 
         User::updateOrCreate(
+            ['email' => 'auditor@gmail.com'],
+            [
+                'name' => 'COA External Auditor',
+                'password' => Hash::make('auditor123'),
+                'role' => 'external_auditor',
+            ]
+        );
+
+        User::updateOrCreate(
             ['email' => 'kagawad@gmail.com'],
             [
                 'name' => 'Barangay Kagawad',

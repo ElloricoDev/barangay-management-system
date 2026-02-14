@@ -57,6 +57,7 @@ class User extends Authenticatable
             'committee_access' => 'committee_access_user',
             'youth_admin' => 'youth_administrator',
             'system_admin' => 'technical_administrator',
+            'auditor' => 'external_auditor',
             default => $this->role,
         };
     }
@@ -93,6 +94,7 @@ class User extends Authenticatable
             'technical_administrator',
             'committee_access_user',
             'youth_administrator',
+            'external_auditor',
         ]);
     }
 

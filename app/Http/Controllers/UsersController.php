@@ -176,6 +176,7 @@ class UsersController extends Controller
             'encoder',
             'data_manager',
             'technical_administrator',
+            'external_auditor',
         ];
     }
 }

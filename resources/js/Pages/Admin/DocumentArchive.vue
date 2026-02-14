@@ -176,6 +176,7 @@ const statusClasses = (status) => {
                     <option value="resident">Resident</option>
                     <option value="certificate">Certificate</option>
                     <option value="blotter">Blotter</option>
+                    <option value="financial">Financial</option>
                     <option value="other">Other</option>
                 </select>
             </div>

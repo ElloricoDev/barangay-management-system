@@ -17,6 +17,7 @@ const canViewCollectionReports = computed(() => hasPermission("collection_report
 const canViewTransactionHistory = computed(() => hasPermission("transaction_history.view"));
 const canViewFinancialSummary = computed(() => hasPermission("financial_summary.view"));
 const canViewFinancialStatements = computed(() => hasPermission("finance.statements.view"));
+const canViewFinancialSubmissions = computed(() => hasPermission("finance.submissions.view"));
 const canAdjustFunds = computed(() => hasPermission("finance.funds.adjust"));
 
 const props = defineProps({
@@ -113,6 +114,7 @@ const formatDateTime = (value) => {
             <Link v-if="canViewTransactionHistory" href="/admin/transaction-history" class="ui-btn ui-btn--ghost px-4 py-3 text-center">Transaction History</Link>
             <Link v-if="canViewFinancialSummary" href="/admin/financial-summary" class="ui-btn ui-btn--ghost px-4 py-3 text-center">Financial Summary</Link>
             <Link v-if="canViewFinancialStatements" href="/admin/financial-statements" class="ui-btn ui-btn--ghost px-4 py-3 text-center">Financial Statements</Link>
+            <Link v-if="canViewFinancialSubmissions" href="/admin/financial-submissions" class="ui-btn ui-btn--ghost px-4 py-3 text-center">Financial Submissions</Link>
         </div>
 
         <div class="mt-5 grid gap-4 xl:grid-cols-2">

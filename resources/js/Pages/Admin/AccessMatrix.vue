@@ -52,6 +52,8 @@ const sidebarChecks = [
     { module: "Collection Reports", permissions: ["collection_reports.view"] },
     { module: "Transaction History", permissions: ["transaction_history.view"] },
     { module: "Financial Summary", permissions: ["financial_summary.view"] },
+    { module: "Financial Statements", permissions: ["finance.statements.view"] },
+    { module: "Financial Submissions", permissions: ["finance.submissions.view"] },
     { module: "Youth Management", permissions: ["youth_management.view"] },
     { module: "Youth Residents", permissions: ["youth_residents.view"] },
     { module: "Youth Programs", permissions: ["youth_programs.view"] },

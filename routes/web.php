@@ -189,6 +189,21 @@ Route::prefix('admin')
         Route::get('/financial-statements/export', [FinancialManagementController::class, 'exportFinancialStatements'])
             ->middleware('permission:finance.reports.export')
             ->name('financial-statements.export');
+        Route::get('/financial-submissions', [FinancialManagementController::class, 'financialSubmissions'])
+            ->middleware('permission:finance.submissions.view')
+            ->name('financial-submissions');
+        Route::post('/financial-submissions', [FinancialManagementController::class, 'storeFinancialSubmission'])
+            ->middleware('permission:finance.submissions.manage')
+            ->name('financial-submissions.store');
+        Route::patch('/financial-submissions/{financialSubmission}/submit', [FinancialManagementController::class, 'submitFinancialSubmission'])
+            ->middleware('permission:finance.submissions.manage')
+            ->name('financial-submissions.submit');
+        Route::patch('/financial-submissions/{financialSubmission}/acknowledge', [FinancialManagementController::class, 'acknowledgeFinancialSubmission'])
+            ->middleware('permission:finance.submissions.review')
+            ->name('financial-submissions.acknowledge');
+        Route::patch('/financial-submissions/{financialSubmission}/return', [FinancialManagementController::class, 'returnFinancialSubmission'])
+            ->middleware('permission:finance.submissions.review')
+            ->name('financial-submissions.return');
         Route::post('/payments', [FinancialManagementController::class, 'store'])
             ->middleware('permission:finance.record')
             ->name('payments.store');

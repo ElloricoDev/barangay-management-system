@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\BudgetAllocation;
 use App\Models\DisbursementRequest;
+use App\Models\Document;
+use App\Models\FinancialSubmission;
 use App\Models\FundAdjustment;
 use App\Models\Payment;
 use App\Models\Resident;
@@ -46,6 +48,28 @@ class FinancialManagementController extends Controller
         'approved',
         'rejected',
         'released',
+    ];
+
+    private const SUBMISSION_AGENCIES = [
+        'coa',
+        'dbm',
+    ];
+
+    private const SUBMISSION_REPORT_TYPES = [
+        'annual_budget',
+        'supplemental_budget',
+        'trial_balance',
+        'statement_of_expenditures',
+        'cash_receipts_disbursements',
+        'collection_report',
+        'other',
+    ];
+
+    private const SUBMISSION_STATUSES = [
+        'draft',
+        'submitted',
+        'acknowledged',
+        'returned',
     ];
 
     public function financialManagement(Request $request): Response
@@ -508,6 +532,8 @@ class FinancialManagementController extends Controller
                     'approver:id,name',
                     'rejectedBy:id,name',
                     'releasedPayment:id,or_number,paid_at',
+                    'requestDocument:id,title,module,original_name,status',
+                    'voucherDocument:id,title,module,original_name,status',
                 ])
                 ->latest('requested_at')
                 ->limit(20)
@@ -523,6 +549,16 @@ class FinancialManagementController extends Controller
                 ->orderBy('first_name')
                 ->limit(300)
                 ->get(),
+            'financeDocuments' => Document::query()
+                ->where('status', 'approved')
+                ->where(function ($query) {
+                    $query->whereIn('module', ['financial', 'other'])
+                        ->orWhereNull('module');
+                })
+                ->with('uploader:id,name')
+                ->latest()
+                ->limit(300)
+                ->get(['id', 'title', 'module', 'original_name', 'status', 'uploaded_by', 'created_at']),
             'summary' => $this->buildSummary($filters['search']),
         ]);
     }
@@ -756,10 +792,238 @@ class FinancialManagementController extends Controller
         }, $filename, $headers);
     }
 
+    public function financialSubmissions(Request $request): Response
+    {
+        $filters = $this->extractSubmissionFilters($request);
+
+        return Inertia::render('Admin/FinancialSubmissions', [
+            'filters' => $filters,
+            'submissions' => $this->buildSubmissionFilteredQuery($filters)
+                ->with([
+                    'document:id,title,module,original_name,status',
+                    'creator:id,name',
+                    'submitter:id,name',
+                    'reviewer:id,name',
+                ])
+                ->paginate(12)
+                ->withQueryString(),
+            'submissionAgencies' => self::SUBMISSION_AGENCIES,
+            'submissionReportTypes' => self::SUBMISSION_REPORT_TYPES,
+            'submissionStatuses' => self::SUBMISSION_STATUSES,
+            'financeDocuments' => Document::query()
+                ->where('status', 'approved')
+                ->where(function ($query) {
+                    $query->whereIn('module', ['financial', 'other'])
+                        ->orWhereNull('module');
+                })
+                ->with('uploader:id,name')
+                ->latest()
+                ->limit(300)
+                ->get(['id', 'title', 'module', 'original_name', 'status', 'uploaded_by', 'created_at']),
+        ]);
+    }
+
+    public function storeFinancialSubmission(Request $request)
+    {
+        $validated = $request->validate([
+            'agency' => ['required', Rule::in(self::SUBMISSION_AGENCIES)],
+            'report_type' => ['required', Rule::in(self::SUBMISSION_REPORT_TYPES)],
+            'period_start' => ['required', 'date'],
+            'period_end' => ['required', 'date', 'after_or_equal:period_start'],
+            'reference_no' => ['nullable', 'string', 'max:120', Rule::unique('financial_submissions', 'reference_no')],
+            'document_id' => ['required', 'exists:documents,id'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $document = $this->validatedApprovedDocument((int) $validated['document_id'], 'document_id');
+        if (! in_array((string) $document->module, ['financial', 'other', ''], true) && $document->module !== null) {
+            throw ValidationException::withMessages([
+                'document_id' => 'Submission document must be tagged as financial or other.',
+            ]);
+        }
+
+        $referenceNo = $validated['reference_no']
+            ?? 'FS-'.strtoupper((string) $validated['agency']).'-'.now()->format('Ymd-His').'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+
+        $submission = FinancialSubmission::create([
+            'agency' => $validated['agency'],
+            'report_type' => $validated['report_type'],
+            'period_start' => $validated['period_start'],
+            'period_end' => $validated['period_end'],
+            'reference_no' => $referenceNo,
+            'status' => 'draft',
+            'document_id' => $document->id,
+            'created_by' => $request->user()->id,
+            'submitted_by' => null,
+            'submitted_at' => null,
+            'reviewed_by' => null,
+            'reviewed_at' => null,
+            'remarks' => $validated['remarks'] ?? null,
+            'review_notes' => null,
+        ]);
+
+        AuditLogger::log(
+            $request,
+            'finance.submissions.create',
+            FinancialSubmission::class,
+            $submission->id,
+            null,
+            $submission->only([
+                'agency',
+                'report_type',
+                'period_start',
+                'period_end',
+                'reference_no',
+                'status',
+                'document_id',
+                'remarks',
+            ])
+        );
+
+        return redirect()->back()->with('success', 'Financial submission record created.');
+    }
+
+    public function submitFinancialSubmission(Request $request, FinancialSubmission $financialSubmission)
+    {
+        if (! in_array($financialSubmission->status, ['draft', 'returned'], true)) {
+            return redirect()->back()->with('error', 'Only draft or returned submissions can be submitted.');
+        }
+
+        $validated = $request->validate([
+            'remarks' => ['nullable', 'string', 'max:1000'],
+            'submitted_at' => ['nullable', 'date'],
+        ]);
+
+        $this->validatedApprovedDocument((int) $financialSubmission->document_id, 'document_id');
+
+        $before = $financialSubmission->only([
+            'status',
+            'submitted_by',
+            'submitted_at',
+            'reviewed_by',
+            'reviewed_at',
+            'review_notes',
+            'remarks',
+        ]);
+
+        $financialSubmission->update([
+            'status' => 'submitted',
+            'submitted_by' => $request->user()->id,
+            'submitted_at' => $validated['submitted_at'] ?? now(),
+            'reviewed_by' => null,
+            'reviewed_at' => null,
+            'review_notes' => null,
+            'remarks' => $validated['remarks'] ?? $financialSubmission->remarks,
+        ]);
+
+        AuditLogger::log(
+            $request,
+            'finance.submissions.submit',
+            FinancialSubmission::class,
+            $financialSubmission->id,
+            $before,
+            $financialSubmission->only([
+                'status',
+                'submitted_by',
+                'submitted_at',
+                'reviewed_by',
+                'reviewed_at',
+                'review_notes',
+                'remarks',
+            ])
+        );
+
+        return redirect()->back()->with('success', 'Financial submission marked as submitted.');
+    }
+
+    public function acknowledgeFinancialSubmission(Request $request, FinancialSubmission $financialSubmission)
+    {
+        if ($financialSubmission->status !== 'submitted') {
+            return redirect()->back()->with('error', 'Only submitted records can be acknowledged.');
+        }
+
+        $validated = $request->validate([
+            'review_notes' => ['nullable', 'string', 'max:1000'],
+            'reviewed_at' => ['nullable', 'date'],
+        ]);
+
+        $before = $financialSubmission->only([
+            'status',
+            'reviewed_by',
+            'reviewed_at',
+            'review_notes',
+        ]);
+
+        $financialSubmission->update([
+            'status' => 'acknowledged',
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => $validated['reviewed_at'] ?? now(),
+            'review_notes' => $validated['review_notes'] ?? $financialSubmission->review_notes,
+        ]);
+
+        AuditLogger::log(
+            $request,
+            'finance.submissions.acknowledge',
+            FinancialSubmission::class,
+            $financialSubmission->id,
+            $before,
+            $financialSubmission->only([
+                'status',
+                'reviewed_by',
+                'reviewed_at',
+                'review_notes',
+            ])
+        );
+
+        return redirect()->back()->with('success', 'Financial submission acknowledged.');
+    }
+
+    public function returnFinancialSubmission(Request $request, FinancialSubmission $financialSubmission)
+    {
+        if ($financialSubmission->status !== 'submitted') {
+            return redirect()->back()->with('error', 'Only submitted records can be returned.');
+        }
+
+        $validated = $request->validate([
+            'review_notes' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $before = $financialSubmission->only([
+            'status',
+            'reviewed_by',
+            'reviewed_at',
+            'review_notes',
+        ]);
+
+        $financialSubmission->update([
+            'status' => 'returned',
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => now(),
+            'review_notes' => $validated['review_notes'],
+        ]);
+
+        AuditLogger::log(
+            $request,
+            'finance.submissions.return',
+            FinancialSubmission::class,
+            $financialSubmission->id,
+            $before,
+            $financialSubmission->only([
+                'status',
+                'reviewed_by',
+                'reviewed_at',
+                'review_notes',
+            ])
+        );
+
+        return redirect()->back()->with('success', 'Financial submission returned for revisions.');
+    }
+
     public function storeDisbursementRequest(Request $request)
     {
         $validated = $request->validate([
             'budget_allocation_id' => ['nullable', 'exists:budget_allocations,id'],
+            'request_document_id' => ['required', 'exists:documents,id'],
             'request_reference' => ['nullable', 'string', 'max:120', Rule::unique('disbursement_requests', 'request_reference')],
             'expense_type' => ['required', Rule::in(self::BUDGET_CATEGORIES)],
             'purpose' => ['required', 'string', 'max:255'],
@@ -767,6 +1031,8 @@ class FinancialManagementController extends Controller
             'voucher_number' => ['nullable', 'string', 'max:120'],
             'remarks' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        $requestDocument = $this->validatedApprovedDocument((int) $validated['request_document_id'], 'request_document_id');
 
         $allocation = null;
         if (! empty($validated['budget_allocation_id'])) {
@@ -789,6 +1055,7 @@ class FinancialManagementController extends Controller
 
         $disbursementRequest = DisbursementRequest::create([
             'budget_allocation_id' => $allocation?->id,
+            'request_document_id' => $requestDocument->id,
             'request_reference' => $requestReference,
             'expense_type' => $validated['expense_type'],
             'purpose' => $validated['purpose'],
@@ -802,6 +1069,7 @@ class FinancialManagementController extends Controller
             'rejected_at' => null,
             'released_payment_id' => null,
             'voucher_number' => $validated['voucher_number'] ?? null,
+            'voucher_document_id' => null,
             'remarks' => $validated['remarks'] ?? null,
             'rejection_reason' => null,
         ]);
@@ -814,6 +1082,7 @@ class FinancialManagementController extends Controller
             null,
             $disbursementRequest->only([
                 'budget_allocation_id',
+                'request_document_id',
                 'request_reference',
                 'expense_type',
                 'purpose',
@@ -822,6 +1091,7 @@ class FinancialManagementController extends Controller
                 'requested_by',
                 'requested_at',
                 'voucher_number',
+                'voucher_document_id',
                 'remarks',
             ])
         );
@@ -834,6 +1104,13 @@ class FinancialManagementController extends Controller
         if ($disbursementRequest->status !== 'requested') {
             return redirect()->back()->with('error', 'Only requested disbursements can be approved.');
         }
+
+        if (! $disbursementRequest->request_document_id) {
+            throw ValidationException::withMessages([
+                'request_document_id' => 'Approved disbursements require an approved request document.',
+            ]);
+        }
+        $this->validatedApprovedDocument((int) $disbursementRequest->request_document_id, 'request_document_id');
 
         $validated = $request->validate([
             'remarks' => ['nullable', 'string', 'max:1000'],
@@ -929,13 +1206,22 @@ class FinancialManagementController extends Controller
             return redirect()->back()->with('error', 'Only approved disbursements can be released.');
         }
 
+        if (! $disbursementRequest->request_document_id) {
+            throw ValidationException::withMessages([
+                'request_document_id' => 'Disbursement release requires an approved request document.',
+            ]);
+        }
+        $this->validatedApprovedDocument((int) $disbursementRequest->request_document_id, 'request_document_id');
+
         $validated = $request->validate([
             'or_number' => ['required', 'string', 'max:100', Rule::unique('payments', 'or_number')],
             'description' => ['nullable', 'string', 'max:255'],
             'voucher_number' => ['nullable', 'string', 'max:120'],
+            'voucher_document_id' => ['required', 'exists:documents,id'],
             'paid_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
+        $voucherDocument = $this->validatedApprovedDocument((int) $validated['voucher_document_id'], 'voucher_document_id');
 
         $amount = (float) $disbursementRequest->amount;
         $impact = $this->ledgerImpactByInput('expense', 'paid', $amount);
@@ -949,6 +1235,7 @@ class FinancialManagementController extends Controller
             'status',
             'released_payment_id',
             'voucher_number',
+            'voucher_document_id',
         ]);
 
         $payment = null;
@@ -980,6 +1267,7 @@ class FinancialManagementController extends Controller
                 'status' => 'released',
                 'released_payment_id' => $payment->id,
                 'voucher_number' => $validated['voucher_number'] ?? $disbursementRequest->voucher_number,
+                'voucher_document_id' => $voucherDocument->id,
                 'remarks' => $validated['notes'] ?? $disbursementRequest->remarks,
             ]);
         });
@@ -994,6 +1282,7 @@ class FinancialManagementController extends Controller
                 'status',
                 'released_payment_id',
                 'voucher_number',
+                'voucher_document_id',
             ])
         );
 
@@ -1374,6 +1663,95 @@ class FinancialManagementController extends Controller
         }
 
         return [$dateFrom, $dateTo];
+    }
+
+    private function extractSubmissionFilters(Request $request): array
+    {
+        $sort = (string) $request->query('sort', 'created_at');
+        $direction = strtolower((string) $request->query('direction', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $sortable = ['agency', 'report_type', 'status', 'period_start', 'period_end', 'submitted_at', 'reviewed_at', 'created_at'];
+
+        if (! in_array($sort, $sortable, true)) {
+            $sort = 'created_at';
+        }
+
+        $agency = trim((string) $request->query('agency', ''));
+        if (! in_array($agency, self::SUBMISSION_AGENCIES, true)) {
+            $agency = '';
+        }
+
+        $reportType = trim((string) $request->query('report_type', ''));
+        if (! in_array($reportType, self::SUBMISSION_REPORT_TYPES, true)) {
+            $reportType = '';
+        }
+
+        $status = trim((string) $request->query('status', ''));
+        if (! in_array($status, self::SUBMISSION_STATUSES, true)) {
+            $status = '';
+        }
+
+        return [
+            'search' => trim((string) $request->query('search', '')),
+            'agency' => $agency,
+            'report_type' => $reportType,
+            'status' => $status,
+            'sort' => $sort,
+            'direction' => $direction,
+        ];
+    }
+
+    private function buildSubmissionFilteredQuery(array $filters)
+    {
+        $search = (string) ($filters['search'] ?? '');
+
+        return FinancialSubmission::query()
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('reference_no', 'like', "%{$search}%")
+                        ->orWhere('agency', 'like', "%{$search}%")
+                        ->orWhere('report_type', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhere('remarks', 'like', "%{$search}%")
+                        ->orWhere('review_notes', 'like', "%{$search}%")
+                        ->orWhereHas('creator', function ($userQuery) use ($search) {
+                            $userQuery->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('submitter', function ($userQuery) use ($search) {
+                            $userQuery->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('reviewer', function ($userQuery) use ($search) {
+                            $userQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->when(($filters['agency'] ?? '') !== '', function ($query) use ($filters) {
+                $query->where('agency', $filters['agency']);
+            })
+            ->when(($filters['report_type'] ?? '') !== '', function ($query) use ($filters) {
+                $query->where('report_type', $filters['report_type']);
+            })
+            ->when(($filters['status'] ?? '') !== '', function ($query) use ($filters) {
+                $query->where('status', $filters['status']);
+            })
+            ->orderBy((string) $filters['sort'], (string) $filters['direction']);
+    }
+
+    private function validatedApprovedDocument(int $documentId, string $field): Document
+    {
+        $document = Document::query()->find($documentId);
+        if (! $document) {
+            throw ValidationException::withMessages([
+                $field => 'Selected document was not found.',
+            ]);
+        }
+
+        if ($document->status !== 'approved') {
+            throw ValidationException::withMessages([
+                $field => 'Selected document must be approved before this action.',
+            ]);
+        }
+
+        return $document;
     }
 
     private function buildTrialBalance(Carbon $dateFrom, Carbon $dateTo): array

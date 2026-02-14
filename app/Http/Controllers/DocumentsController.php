@@ -64,7 +64,7 @@ class DocumentsController extends Controller
     {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'module' => ['nullable', 'in:resident,certificate,blotter,other'],
+            'module' => ['nullable', 'in:resident,certificate,blotter,financial,other'],
             'resident_id' => ['nullable', 'exists:residents,id'],
             'certificate_id' => ['nullable', 'exists:certificates,id'],
             'blotter_id' => ['nullable', 'exists:blotters,id'],
