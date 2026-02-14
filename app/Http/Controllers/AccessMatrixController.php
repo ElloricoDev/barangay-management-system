@@ -16,6 +16,7 @@ class AccessMatrixController extends Controller
         ['module' => 'Blotter Records', 'permissions' => ['blotter.view']],
         ['module' => 'Financial Management', 'permissions' => ['financial_management.view']],
         ['module' => 'Payment Processing', 'permissions' => ['payment_processing.view']],
+        ['module' => 'Disbursement Requests', 'permissions' => ['finance.disbursement.view']],
         ['module' => 'Official Receipts', 'permissions' => ['official_receipts.view']],
         ['module' => 'Collection Reports', 'permissions' => ['collection_reports.view']],
         ['module' => 'Transaction History', 'permissions' => ['transaction_history.view']],

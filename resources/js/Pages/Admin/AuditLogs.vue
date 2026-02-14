@@ -239,6 +239,13 @@ const exportUrl = computed(() => {
                     <option value="certificate">Certificate</option>
                     <option value="blotter">Blotter</option>
                     <option value="user">User</option>
+                    <option value="payment">Payment</option>
+                    <option value="budget">Budget</option>
+                    <option value="disbursement">Disbursement</option>
+                    <option value="fund_adjustment">Fund Adjustment</option>
+                    <option value="document">Document</option>
+                    <option value="role_permission">Role Permission</option>
+                    <option value="system_setting">System Setting</option>
                 </select>
 
                 <input

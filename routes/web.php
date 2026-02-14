@@ -147,9 +147,30 @@ Route::prefix('admin')
         Route::delete('/budget-planning/{allocation}', [FinancialManagementController::class, 'destroyBudget'])
             ->middleware('permission:finance.budget.manage')
             ->name('budget-planning.destroy');
+        Route::patch('/budget-planning/{allocation}/submit', [FinancialManagementController::class, 'submitBudget'])
+            ->middleware('permission:finance.budget.submit')
+            ->name('budget-planning.submit');
+        Route::patch('/budget-planning/{allocation}/approve', [FinancialManagementController::class, 'approveBudget'])
+            ->middleware('permission:finance.budget.approve')
+            ->name('budget-planning.approve');
+        Route::patch('/budget-planning/{allocation}/reject', [FinancialManagementController::class, 'rejectBudget'])
+            ->middleware('permission:finance.budget.approve')
+            ->name('budget-planning.reject');
         Route::get('/payment-processing', [FinancialManagementController::class, 'paymentProcessing'])
             ->middleware('permission:payment_processing.view')
             ->name('payment-processing');
+        Route::post('/disbursement-requests', [FinancialManagementController::class, 'storeDisbursementRequest'])
+            ->middleware('permission:finance.disbursement.request')
+            ->name('disbursement-requests.store');
+        Route::patch('/disbursement-requests/{disbursementRequest}/approve', [FinancialManagementController::class, 'approveDisbursementRequest'])
+            ->middleware('permission:finance.disbursement.approve')
+            ->name('disbursement-requests.approve');
+        Route::patch('/disbursement-requests/{disbursementRequest}/reject', [FinancialManagementController::class, 'rejectDisbursementRequest'])
+            ->middleware('permission:finance.disbursement.approve')
+            ->name('disbursement-requests.reject');
+        Route::patch('/disbursement-requests/{disbursementRequest}/release', [FinancialManagementController::class, 'releaseDisbursementRequest'])
+            ->middleware('permission:finance.disbursement.release')
+            ->name('disbursement-requests.release');
         Route::get('/official-receipts', [FinancialManagementController::class, 'officialReceipts'])
             ->middleware('permission:official_receipts.view')
             ->name('official-receipts');

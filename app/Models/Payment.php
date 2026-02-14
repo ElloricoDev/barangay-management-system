@@ -12,6 +12,8 @@ class Payment extends Model
     protected $fillable = [
         'resident_id',
         'certificate_id',
+        'disbursement_request_id',
+        'budget_allocation_id',
         'collected_by',
         'approved_by',
         'or_number',
@@ -43,6 +45,16 @@ class Payment extends Model
     public function certificate()
     {
         return $this->belongsTo(Certificate::class);
+    }
+
+    public function disbursementRequest()
+    {
+        return $this->belongsTo(DisbursementRequest::class);
+    }
+
+    public function budgetAllocation()
+    {
+        return $this->belongsTo(BudgetAllocation::class);
     }
 
     public function collector()

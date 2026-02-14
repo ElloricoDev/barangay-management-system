@@ -106,6 +106,13 @@ class AuditLogsController extends Controller
                     'certificate' => 'Certificate',
                     'blotter' => 'Blotter',
                     'user' => 'User',
+                    'payment' => 'Payment',
+                    'budget' => 'BudgetAllocation',
+                    'disbursement' => 'DisbursementRequest',
+                    'fund_adjustment' => 'FundAdjustment',
+                    'document' => 'Document',
+                    'role_permission' => 'RolePermission',
+                    'system_setting' => 'SystemSetting',
                 ];
 
                 if (isset($map[$filters['module']])) {
@@ -217,6 +224,7 @@ class AuditLogsController extends Controller
             'logout' => 'Logged Out',
             'record' => 'Recorded',
             'adjust' => 'Adjusted',
+            'request' => 'Requested',
         ];
 
         if (count($parts) === 1) {

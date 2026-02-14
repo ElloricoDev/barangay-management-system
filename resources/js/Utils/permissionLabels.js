@@ -35,6 +35,7 @@ const moduleMap = {
     settings: "Settings",
     funds: "Funds",
     budget: "Budget",
+    disbursement: "Disbursement",
 };
 
 const actionMap = {
@@ -75,4 +76,3 @@ export const permissionLabel = (permission) => {
     const resource = toWords(parts.slice(0, -1).join("_"));
     return `${resource}: ${action}`;
 };
-
