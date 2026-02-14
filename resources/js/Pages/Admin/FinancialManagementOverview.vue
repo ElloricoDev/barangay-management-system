@@ -11,6 +11,7 @@ const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
 const permissions = computed(() => page.props.auth?.permissions ?? []);
 const hasPermission = (permission) => permissions.value.includes(permission);
 const canViewPaymentProcessing = computed(() => hasPermission("payment_processing.view"));
+const canViewBudgetPlanning = computed(() => hasPermission("finance.budget.view"));
 const canViewOfficialReceipts = computed(() => hasPermission("official_receipts.view"));
 const canViewCollectionReports = computed(() => hasPermission("collection_reports.view"));
 const canViewTransactionHistory = computed(() => hasPermission("transaction_history.view"));
@@ -23,12 +24,15 @@ const props = defineProps({
         default: () => ({
             barangay_funds: 0,
             total_collections: 0,
+            total_expenses: 0,
+            pending_disbursements: 0,
             total_credits: 0,
             total_debits: 0,
             net_adjustments: 0,
             available_funds: 0,
             transactions_count: 0,
             today_collections: 0,
+            today_disbursements: 0,
         }),
     },
     recentPayments: {
@@ -89,15 +93,19 @@ const formatDateTime = (value) => {
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DashboardStatCard label="Opening Funds" :value="formatMoney(props.summary.barangay_funds)" />
             <DashboardStatCard label="Total Collections" :value="formatMoney(props.summary.total_collections)" />
+            <DashboardStatCard label="Total Disbursements" :value="formatMoney(props.summary.total_expenses)" />
+            <DashboardStatCard label="Pending Disbursements" :value="formatMoney(props.summary.pending_disbursements)" />
             <DashboardStatCard label="Fund Credits" :value="formatMoney(props.summary.total_credits)" />
             <DashboardStatCard label="Fund Debits" :value="formatMoney(props.summary.total_debits)" />
             <DashboardStatCard label="Net Adjustments" :value="formatMoney(props.summary.net_adjustments)" />
             <DashboardStatCard label="Available Funds" :value="formatMoney(props.summary.available_funds)" />
             <DashboardStatCard label="Transactions" :value="props.summary.transactions_count" />
             <DashboardStatCard label="Today Collections" :value="formatMoney(props.summary.today_collections)" />
+            <DashboardStatCard label="Today Disbursements" :value="formatMoney(props.summary.today_disbursements)" />
         </div>
 
         <div class="mt-4 grid gap-3 md:grid-cols-3">
+            <Link v-if="canViewBudgetPlanning" href="/admin/budget-planning" class="ui-btn ui-btn--ghost px-4 py-3 text-center">Budget Planning</Link>
             <Link v-if="canViewPaymentProcessing" href="/admin/payment-processing" class="ui-btn ui-btn--ghost px-4 py-3 text-center">Payment Processing</Link>
             <Link v-if="canViewOfficialReceipts" href="/admin/official-receipts" class="ui-btn ui-btn--ghost px-4 py-3 text-center">Official Receipts</Link>
             <Link v-if="canViewCollectionReports" href="/admin/collection-reports" class="ui-btn ui-btn--ghost px-4 py-3 text-center">Collection Reports</Link>

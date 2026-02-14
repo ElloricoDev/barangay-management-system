@@ -29,8 +29,38 @@ const { search, sortBy, sortIndicator } = useListQuery({
     defaultSort: "paid_at",
 });
 
-const createForm = useForm({ resident_id: "", or_number: "", service_type: "certificate", description: "", amount: "", paid_at: "", notes: "" });
-const editForm = useForm({ resident_id: "", or_number: "", service_type: "certificate", description: "", amount: "", paid_at: "", notes: "" });
+const createForm = useForm({
+    resident_id: "",
+    transaction_type: "revenue",
+    workflow_status: "paid",
+    or_number: "",
+    revenue_source: "fines_fees",
+    expense_type: "",
+    request_reference: "",
+    voucher_number: "",
+    service_type: "certificate",
+    description: "",
+    amount: "",
+    paid_at: "",
+    approved_at: "",
+    notes: "",
+});
+const editForm = useForm({
+    resident_id: "",
+    transaction_type: "revenue",
+    workflow_status: "paid",
+    or_number: "",
+    revenue_source: "fines_fees",
+    expense_type: "",
+    request_reference: "",
+    voucher_number: "",
+    service_type: "certificate",
+    description: "",
+    amount: "",
+    paid_at: "",
+    approved_at: "",
+    notes: "",
+});
 const showEditModal = ref(false);
 const showDeleteModal = ref(false);
 const selectedPayment = ref(null);
@@ -39,7 +69,19 @@ const submitCreate = () => {
     if (!canRecord.value) return;
     createForm.post("/admin/payments", {
         preserveScroll: true,
-        onSuccess: () => createForm.reset("resident_id", "or_number", "service_type", "description", "amount", "paid_at", "notes"),
+        onSuccess: () => createForm.reset(
+            "resident_id",
+            "or_number",
+            "expense_type",
+            "request_reference",
+            "voucher_number",
+            "service_type",
+            "description",
+            "amount",
+            "paid_at",
+            "approved_at",
+            "notes"
+        ),
     });
 };
 
@@ -47,11 +89,18 @@ const openEditModal = (payment) => {
     if (!canRecord.value) return;
     selectedPayment.value = payment;
     editForm.resident_id = payment.resident_id ?? "";
-    editForm.or_number = payment.or_number;
+    editForm.transaction_type = payment.transaction_type ?? "revenue";
+    editForm.workflow_status = payment.workflow_status ?? "paid";
+    editForm.or_number = payment.or_number ?? "";
+    editForm.revenue_source = payment.revenue_source ?? "fines_fees";
+    editForm.expense_type = payment.expense_type ?? "";
+    editForm.request_reference = payment.request_reference ?? "";
+    editForm.voucher_number = payment.voucher_number ?? "";
     editForm.service_type = payment.service_type;
     editForm.description = payment.description;
     editForm.amount = payment.amount;
     editForm.paid_at = payment.paid_at ? payment.paid_at.slice(0, 16) : "";
+    editForm.approved_at = payment.approved_at ? payment.approved_at.slice(0, 16) : "";
     editForm.notes = payment.notes ?? "";
     showEditModal.value = true;
 };

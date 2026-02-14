@@ -135,6 +135,18 @@ Route::prefix('admin')
         Route::post('/financial-management/adjust-funds', [FinancialManagementController::class, 'adjustFunds'])
             ->middleware('permission:finance.funds.adjust')
             ->name('financial-management.adjust-funds');
+        Route::get('/budget-planning', [FinancialManagementController::class, 'budgetPlanning'])
+            ->middleware('permission:finance.budget.view')
+            ->name('budget-planning');
+        Route::post('/budget-planning', [FinancialManagementController::class, 'storeBudget'])
+            ->middleware('permission:finance.budget.manage')
+            ->name('budget-planning.store');
+        Route::put('/budget-planning/{allocation}', [FinancialManagementController::class, 'updateBudget'])
+            ->middleware('permission:finance.budget.manage')
+            ->name('budget-planning.update');
+        Route::delete('/budget-planning/{allocation}', [FinancialManagementController::class, 'destroyBudget'])
+            ->middleware('permission:finance.budget.manage')
+            ->name('budget-planning.destroy');
         Route::get('/payment-processing', [FinancialManagementController::class, 'paymentProcessing'])
             ->middleware('permission:payment_processing.view')
             ->name('payment-processing');

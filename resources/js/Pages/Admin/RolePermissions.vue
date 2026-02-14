@@ -5,6 +5,7 @@ import AdminLayout from "../../Layouts/AdminLayout.vue";
 import FlashMessages from "../../Components/ui/FlashMessages.vue";
 import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
 import PageHeader from "../../Components/ui/PageHeader.vue";
+import { permissionLabel } from "../../Utils/permissionLabels";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -54,7 +55,10 @@ const normalizedRoleLabel = (role) =>
 const filteredPermissions = computed(() => {
     if (!search.value.trim()) return props.allPermissions;
     const query = search.value.toLowerCase();
-    return props.allPermissions.filter((permission) => permission.toLowerCase().includes(query));
+    return props.allPermissions.filter((permission) =>
+        permission.toLowerCase().includes(query) ||
+        permissionLabel(permission).toLowerCase().includes(query)
+    );
 });
 
 const changeRole = (role) => {
@@ -186,7 +190,7 @@ const confirmResetAllRoles = () => {
                                 :checked="selectedPermissions.includes(permission)"
                                 @change="togglePermission(permission)"
                             />
-                            <span class="text-sm text-slate-700">{{ permission }}</span>
+                            <span class="text-sm text-slate-700">{{ permissionLabel(permission) }}</span>
                         </label>
                     </div>
                     <p v-if="filteredPermissions.length === 0" class="text-sm text-slate-500">No permissions match the search.</p>

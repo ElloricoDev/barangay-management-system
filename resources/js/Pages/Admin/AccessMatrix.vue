@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
 import PageHeader from "../../Components/ui/PageHeader.vue";
+import { permissionLabel } from "../../Utils/permissionLabels";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -28,7 +29,10 @@ const filteredPermissions = computed(() => {
     if (!search.value.trim()) return selectedRow.value.effective_permissions;
 
     const query = search.value.toLowerCase();
-    return selectedRow.value.effective_permissions.filter((permission) => permission.toLowerCase().includes(query));
+    return selectedRow.value.effective_permissions.filter((permission) =>
+        permission.toLowerCase().includes(query) ||
+        permissionLabel(permission).toLowerCase().includes(query)
+    );
 });
 
 const normalizedRoleLabel = (role) =>
@@ -139,7 +143,7 @@ const simulationResults = computed(() => {
                             :key="permission"
                             class="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-700"
                         >
-                            {{ permission }}
+                            {{ permissionLabel(permission) }}
                         </div>
                     </div>
                     <p v-if="filteredPermissions.length === 0" class="text-sm text-slate-500">No permissions match the filter.</p>
@@ -167,7 +171,7 @@ const simulationResults = computed(() => {
                                             {{ row.allowed ? "Allowed" : "Blocked" }}
                                         </span>
                                     </td>
-                                    <td class="px-3 py-2 text-slate-600">{{ row.required.join(" or ") }}</td>
+                                    <td class="px-3 py-2 text-slate-600">{{ row.required.map(permissionLabel).join(" or ") }}</td>
                                 </tr>
                             </tbody>
                         </table>

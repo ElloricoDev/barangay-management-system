@@ -62,11 +62,11 @@ class AuditLogsController extends Controller
                     (string) $log->created_at,
                     (string) ($log->user?->name ?? 'System'),
                     (string) ($log->user?->email ?? ''),
-                    (string) $log->action,
+                    (string) $this->actionLabel((string) $log->action),
                     (string) class_basename($log->auditable_type),
                     (string) $log->auditable_id,
-                    json_encode($this->maskSensitiveArray($log->before ?? []), JSON_UNESCAPED_SLASHES),
-                    json_encode($this->maskSensitiveArray($log->after ?? []), JSON_UNESCAPED_SLASHES),
+                    json_encode($this->formatForExport($this->maskSensitiveArray($log->before ?? [])), JSON_UNESCAPED_SLASHES),
+                    json_encode($this->formatForExport($this->maskSensitiveArray($log->after ?? [])), JSON_UNESCAPED_SLASHES),
                     (string) ($log->ip_address ?? ''),
                 ]);
             }
@@ -143,5 +143,131 @@ class AuditLogsController extends Controller
         }
 
         return $masked;
+    }
+
+    private function formatForExport(array $payload): array
+    {
+        $formatted = [];
+
+        foreach ($payload as $key => $value) {
+            if (is_array($value)) {
+                $formatted[$key] = $this->formatForExport($value);
+                continue;
+            }
+
+            if ($this->isPermissionKey((string) $key)) {
+                $formatted[$key] = $this->formatPermissionValues($value);
+                continue;
+            }
+
+            $formatted[$key] = $value;
+        }
+
+        return $formatted;
+    }
+
+    private function isPermissionKey(string $key): bool
+    {
+        $normalized = strtolower($key);
+        return $normalized === 'permissions' || str_ends_with($normalized, '_permissions');
+    }
+
+    private function formatPermissionValues(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            return array_map(fn ($item) => $this->permissionLabel((string) $item), $value);
+        }
+
+        if (is_string($value) && str_contains($value, ',')) {
+            $parts = array_values(array_filter(array_map('trim', explode(',', $value))));
+            return array_map(fn ($item) => $this->permissionLabel((string) $item), $parts);
+        }
+
+        if (is_string($value)) {
+            return $this->permissionLabel($value);
+        }
+
+        return $value;
+    }
+
+    private function actionLabel(string $action): string
+    {
+        $parts = array_values(array_filter(explode('.', trim($action))));
+        if (empty($parts)) {
+            return $action;
+        }
+
+        $verbMap = [
+            'create' => 'Created',
+            'update' => 'Updated',
+            'delete' => 'Deleted',
+            'destroy' => 'Deleted',
+            'approve' => 'Approved',
+            'reject' => 'Rejected',
+            'submit' => 'Submitted',
+            'release' => 'Released',
+            'upload' => 'Uploaded',
+            'download' => 'Downloaded',
+            'export' => 'Exported',
+            'archive' => 'Archived',
+            'restore' => 'Restored',
+            'reset' => 'Reset',
+            'toggle' => 'Toggled',
+            'login' => 'Logged In',
+            'logout' => 'Logged Out',
+            'record' => 'Recorded',
+            'adjust' => 'Adjusted',
+        ];
+
+        if (count($parts) === 1) {
+            return $verbMap[strtolower($parts[0])] ?? $this->words($parts[0]);
+        }
+
+        $verbRaw = strtolower($parts[count($parts) - 1]);
+        $verb = $verbMap[$verbRaw] ?? $this->words($parts[count($parts) - 1]);
+        $target = $this->words(implode('_', array_slice($parts, 0, -1)));
+
+        return trim("{$verb} {$target}");
+    }
+
+    private function permissionLabel(string $permission): string
+    {
+        $parts = explode('.', trim($permission));
+        if (count($parts) <= 1) {
+            return $this->words($permission);
+        }
+
+        $actionMap = [
+            'view' => 'View',
+            'create' => 'Create',
+            'update' => 'Update',
+            'delete' => 'Delete',
+            'approve' => 'Approve',
+            'reject' => 'Reject',
+            'submit' => 'Submit',
+            'release_if_approved' => 'Release (If Approved)',
+            'upload' => 'Upload',
+            'download' => 'Download',
+            'export' => 'Export',
+            'archive' => 'Archive',
+            'restore' => 'Restore',
+            'reset' => 'Reset',
+            'manage' => 'Manage',
+            'record' => 'Record',
+            'toggle' => 'Toggle',
+        ];
+
+        $action = $actionMap[$parts[count($parts) - 1]] ?? $this->words($parts[count($parts) - 1]);
+        $resource = $this->words(implode('_', array_slice($parts, 0, -1)));
+
+        return "{$resource}: {$action}";
+    }
+
+    private function words(string $value): string
+    {
+        return collect(explode('_', str_replace('-', '_', $value)))
+            ->filter()
+            ->map(fn ($chunk) => ucfirst($chunk))
+            ->implode(' ');
     }
 }

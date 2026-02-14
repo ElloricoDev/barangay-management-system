@@ -17,7 +17,7 @@ const canExportReports = computed(() => permissions.value.includes("finance.repo
 const props = defineProps({
     payments: { type: Object, required: true },
     filters: { type: Object, default: () => ({ search: "", sort: "paid_at", direction: "desc" }) },
-    summary: { type: Object, default: () => ({ total_collections: 0, transactions_count: 0, today_collections: 0 }) },
+    summary: { type: Object, default: () => ({ total_collections: 0, total_expenses: 0, pending_disbursements: 0, transactions_count: 0, today_collections: 0, today_disbursements: 0 }) },
     serviceTotals: { type: Array, default: () => [] },
 });
 
@@ -58,8 +58,11 @@ const formatDate = (value) => {
 
         <div class="mb-4 grid gap-3 md:grid-cols-3">
             <DashboardStatCard label="Total Collections" :value="formatMoney(props.summary.total_collections)" />
+            <DashboardStatCard label="Total Disbursements" :value="formatMoney(props.summary.total_expenses)" />
+            <DashboardStatCard label="Pending Disbursements" :value="formatMoney(props.summary.pending_disbursements)" />
             <DashboardStatCard label="Transactions" :value="props.summary.transactions_count" />
             <DashboardStatCard label="Today Collections" :value="formatMoney(props.summary.today_collections)" />
+            <DashboardStatCard label="Today Disbursements" :value="formatMoney(props.summary.today_disbursements)" />
         </div>
 
         <div class="mb-4 rounded-lg border border-slate-200 p-4">
@@ -67,15 +70,16 @@ const formatDate = (value) => {
             <div class="ui-table-wrap">
                 <table class="ui-table">
                     <thead>
-                        <tr><th>Service Type</th><th>Transactions</th><th>Total</th></tr>
+                        <tr><th>Type</th><th>Category</th><th>Transactions</th><th>Total</th></tr>
                     </thead>
                     <tbody>
-                        <tr v-for="row in props.serviceTotals" :key="row.service_type">
-                            <td>{{ row.service_type }}</td>
+                        <tr v-for="row in props.serviceTotals" :key="`${row.transaction_type}-${row.category}`">
+                            <td class="capitalize">{{ row.transaction_type }}</td>
+                            <td>{{ row.category }}</td>
                             <td>{{ row.transactions_count }}</td>
                             <td class="font-medium text-slate-800">{{ formatMoney(row.total_amount) }}</td>
                         </tr>
-                        <tr v-if="props.serviceTotals.length === 0"><td colspan="3" class="px-4 py-6 text-center text-slate-500">No service totals available.</td></tr>
+                        <tr v-if="props.serviceTotals.length === 0"><td colspan="4" class="px-4 py-6 text-center text-slate-500">No service totals available.</td></tr>
                     </tbody>
                 </table>
             </div>

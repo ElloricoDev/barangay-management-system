@@ -95,7 +95,7 @@ class AccessMatrixController extends Controller
                 return;
             }
 
-            fputcsv($handle, ['Role', 'Module', 'Status', 'Required Permissions', 'Effective Permission Count']);
+            fputcsv($handle, ['Role', 'Module', 'Status', 'Required Permissions (Readable)', 'Required Permissions (Key)', 'Effective Permission Count']);
 
             foreach ($roles as $role) {
                 $defaultPermissions = array_values($defaults[$role] ?? []);
@@ -106,9 +106,10 @@ class AccessMatrixController extends Controller
                     $isAllowed = collect($check['permissions'])->contains(fn ($permission) => isset($allowed[$permission]));
 
                     fputcsv($handle, [
-                        $role,
+                        $this->roleLabel($role),
                         $check['module'],
                         $isAllowed ? 'allowed' : 'blocked',
+                        implode(' or ', array_map(fn ($permission) => $this->permissionLabel($permission), $check['permissions'])),
                         implode(' or ', $check['permissions']),
                         count($effectivePermissions),
                     ]);
@@ -119,5 +120,55 @@ class AccessMatrixController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
+    }
+
+    private function roleLabel(string $role): string
+    {
+        return collect(explode('_', $role))
+            ->filter()
+            ->map(fn ($chunk) => ucfirst($chunk))
+            ->implode(' ');
+    }
+
+    private function permissionLabel(string $permission): string
+    {
+        $parts = explode('.', $permission);
+        if (count($parts) === 1) {
+            return $this->words($parts[0]);
+        }
+
+        $actionMap = [
+            'view' => 'View',
+            'create' => 'Create',
+            'update' => 'Update',
+            'delete' => 'Delete',
+            'approve' => 'Approve',
+            'reject' => 'Reject',
+            'submit' => 'Submit',
+            'release_if_approved' => 'Release (If Approved)',
+            'upload' => 'Upload',
+            'download' => 'Download',
+            'export' => 'Export',
+            'archive' => 'Archive',
+            'restore' => 'Restore',
+            'reset' => 'Reset',
+            'manage' => 'Manage',
+            'record' => 'Record',
+            'toggle' => 'Toggle',
+        ];
+
+        $actionKey = $parts[count($parts) - 1];
+        $resource = implode('_', array_slice($parts, 0, -1));
+        $action = $actionMap[$actionKey] ?? $this->words($actionKey);
+
+        return $this->words($resource).': '.$action;
+    }
+
+    private function words(string $value): string
+    {
+        return collect(explode('_', str_replace('-', '_', $value)))
+            ->filter()
+            ->map(fn ($chunk) => ucfirst($chunk))
+            ->implode(' ');
     }
 }

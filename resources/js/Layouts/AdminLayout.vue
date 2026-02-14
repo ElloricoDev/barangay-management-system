@@ -23,6 +23,7 @@ const navItems = computed(() => [
     { href: "/admin/certificates", label: "Certificate Management", icon: "certificates", show: hasPermission("certificates.view") },
     { href: "/admin/blotter", label: "Blotter Cases", icon: "blotter", show: hasPermission("blotter.view") },
     { href: "/admin/financial-management", label: "Financial Management", icon: "financial", show: hasPermission("financial_management.view") },
+    { href: "/admin/budget-planning", label: "Budget Planning", icon: "summary", show: hasPermission("finance.budget.view") },
     { href: "/admin/payment-processing", label: "Payment Processing", icon: "payment", show: hasPermission("payment_processing.view") },
     { href: "/admin/official-receipts", label: "Official Receipts", icon: "receipts", show: hasPermission("official_receipts.view") },
     { href: "/admin/collection-reports", label: "Collection Reports", icon: "collection", show: hasPermission("collection_reports.view") },

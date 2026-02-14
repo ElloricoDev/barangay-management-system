@@ -1,4 +1,9 @@
 <script setup>
+const prettify = (value) =>
+    String(value ?? "-")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+
 defineProps({
     payments: {
         type: Array,
@@ -35,6 +40,14 @@ const emit = defineEmits(["sort"]);
             <thead>
                 <tr>
                     <th>
+                        <button v-if="sortable" type="button" @click="emit('sort', 'transaction_type')">Type {{ sortIndicator("transaction_type") }}</button>
+                        <span v-else>Type</span>
+                    </th>
+                    <th>
+                        <button v-if="sortable" type="button" @click="emit('sort', 'workflow_status')">Status {{ sortIndicator("workflow_status") }}</button>
+                        <span v-else>Status</span>
+                    </th>
+                    <th>
                         <button v-if="sortable" type="button" @click="emit('sort', 'or_number')">OR No. {{ sortIndicator("or_number") }}</button>
                         <span v-else>OR No.</span>
                     </th>
@@ -47,6 +60,7 @@ const emit = defineEmits(["sort"]);
                         <span v-else>Service</span>
                     </th>
                     <th>Description</th>
+                    <th>Reference</th>
                     <th>
                         <button v-if="sortable" type="button" @click="emit('sort', 'amount')">Amount {{ sortIndicator("amount") }}</button>
                         <span v-else>Amount</span>
@@ -61,10 +75,13 @@ const emit = defineEmits(["sort"]);
             </thead>
             <tbody>
                 <tr v-for="payment in payments" :key="payment.id">
+                    <td>{{ prettify(payment.transaction_type ?? "revenue") }}</td>
+                    <td>{{ prettify(payment.workflow_status ?? "paid") }}</td>
                     <td>{{ payment.or_number }}</td>
                     <td>{{ payment.resident ? `${payment.resident.last_name}, ${payment.resident.first_name}` : "-" }}</td>
-                    <td>{{ payment.service_type }}</td>
+                    <td>{{ prettify(payment.revenue_source ?? payment.expense_type ?? payment.service_type) }}</td>
                     <td>{{ payment.description }}</td>
+                    <td>{{ payment.request_reference ?? payment.voucher_number ?? "-" }}</td>
                     <td class="font-medium text-slate-800">{{ formatMoney(payment.amount) }}</td>
                     <td>{{ formatDate(payment.paid_at) }}</td>
                     <td>{{ payment.collector?.name ?? "-" }}</td>
@@ -73,7 +90,7 @@ const emit = defineEmits(["sort"]);
                     </td>
                 </tr>
                 <tr v-if="payments.length === 0">
-                    <td :colspan="showActions ? 8 : 7" class="px-4 py-6 text-center text-slate-500">No payment records found.</td>
+                    <td :colspan="showActions ? 11 : 10" class="px-4 py-6 text-center text-slate-500">No payment records found.</td>
                 </tr>
             </tbody>
         </table>

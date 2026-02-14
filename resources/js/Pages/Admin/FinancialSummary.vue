@@ -15,12 +15,15 @@ const props = defineProps({
         default: () => ({
             barangay_funds: 0,
             total_collections: 0,
+            total_expenses: 0,
+            pending_disbursements: 0,
             total_credits: 0,
             total_debits: 0,
             net_adjustments: 0,
             available_funds: 0,
             transactions_count: 0,
             today_collections: 0,
+            today_disbursements: 0,
         }),
     },
     serviceTotals: { type: Array, default: () => [] },
@@ -42,12 +45,15 @@ const formatMoney = (value) =>
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DashboardStatCard label="Opening Funds" :value="formatMoney(props.summary.barangay_funds)" />
             <DashboardStatCard label="Total Collections" :value="formatMoney(props.summary.total_collections)" />
+            <DashboardStatCard label="Total Disbursements" :value="formatMoney(props.summary.total_expenses)" />
+            <DashboardStatCard label="Pending Disbursements" :value="formatMoney(props.summary.pending_disbursements)" />
             <DashboardStatCard label="Fund Credits" :value="formatMoney(props.summary.total_credits)" />
             <DashboardStatCard label="Fund Debits" :value="formatMoney(props.summary.total_debits)" />
             <DashboardStatCard label="Net Adjustments" :value="formatMoney(props.summary.net_adjustments)" />
             <DashboardStatCard label="Available Funds" :value="formatMoney(props.summary.available_funds)" />
             <DashboardStatCard label="Transactions" :value="props.summary.transactions_count" />
             <DashboardStatCard label="Today Collections" :value="formatMoney(props.summary.today_collections)" />
+            <DashboardStatCard label="Today Disbursements" :value="formatMoney(props.summary.today_disbursements)" />
         </div>
 
         <div class="mt-4 grid gap-4 md:grid-cols-2">
@@ -56,15 +62,16 @@ const formatMoney = (value) =>
                 <div class="ui-table-wrap">
                     <table class="ui-table">
                         <thead>
-                            <tr><th>Service</th><th>Transactions</th><th>Total</th></tr>
+                            <tr><th>Type</th><th>Category</th><th>Transactions</th><th>Total</th></tr>
                         </thead>
                         <tbody>
-                            <tr v-for="row in props.serviceTotals" :key="row.service_type">
-                                <td>{{ row.service_type }}</td>
+                            <tr v-for="row in props.serviceTotals" :key="`${row.transaction_type}-${row.category}`">
+                                <td class="capitalize">{{ row.transaction_type }}</td>
+                                <td>{{ row.category }}</td>
                                 <td>{{ row.transactions_count }}</td>
                                 <td class="font-medium text-slate-800">{{ formatMoney(row.total_amount) }}</td>
                             </tr>
-                            <tr v-if="props.serviceTotals.length === 0"><td colspan="3" class="px-4 py-6 text-center text-slate-500">No service data.</td></tr>
+                            <tr v-if="props.serviceTotals.length === 0"><td colspan="4" class="px-4 py-6 text-center text-slate-500">No service data.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -75,15 +82,17 @@ const formatMoney = (value) =>
                 <div class="ui-table-wrap">
                     <table class="ui-table">
                         <thead>
-                            <tr><th>Month</th><th>Transactions</th><th>Total</th></tr>
+                            <tr><th>Month</th><th>Revenue</th><th>Expense</th><th>Net</th><th>Transactions</th></tr>
                         </thead>
                         <tbody>
                             <tr v-for="row in props.monthlyTotals" :key="row.month">
                                 <td>{{ row.month }}</td>
-                                <td>{{ row.transactions_count }}</td>
+                                <td>{{ formatMoney(row.revenue_total) }}</td>
+                                <td>{{ formatMoney(row.expense_total) }}</td>
                                 <td class="font-medium text-slate-800">{{ formatMoney(row.total_amount) }}</td>
+                                <td>{{ row.transactions_count }}</td>
                             </tr>
-                            <tr v-if="props.monthlyTotals.length === 0"><td colspan="3" class="px-4 py-6 text-center text-slate-500">No monthly data.</td></tr>
+                            <tr v-if="props.monthlyTotals.length === 0"><td colspan="5" class="px-4 py-6 text-center text-slate-500">No monthly data.</td></tr>
                         </tbody>
                     </table>
                 </div>

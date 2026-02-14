@@ -5,6 +5,7 @@ import AdminLayout from "../../Layouts/AdminLayout.vue";
 import PageHeader from "../../Components/ui/PageHeader.vue";
 import ModalDialog from "../../Components/ui/ModalDialog.vue";
 import { actionLabel, moduleLabel } from "../../Utils/activityLabels";
+import { permissionLabel } from "../../Utils/permissionLabels";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -94,6 +95,14 @@ const formatFieldLabel = (key) => {
 const formatValue = (key, value) => {
     if (isSensitiveKey(key)) return "[MASKED]";
     if (value === null || value === undefined) return "-";
+    if (isPermissionField(key)) {
+        if (Array.isArray(value)) return value.map((item) => permissionLabel(String(item))).join(", ");
+        if (typeof value === "string") {
+            const items = toStringList(value);
+            if (items.length > 1) return items.map((item) => permissionLabel(item)).join(", ");
+            return permissionLabel(value);
+        }
+    }
     if (typeof value === "boolean") return value ? "Yes" : "No";
     if (isDateOnlyString(value)) {
         const [year, month, day] = value.split("-");
@@ -303,7 +312,7 @@ const exportUrl = computed(() => {
                                                 :key="`${change.key}-added-${item}`"
                                                 class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
                                             >
-                                                {{ item }}
+                                                {{ permissionLabel(item) }}
                                             </span>
                                             <span v-if="listDiff(change.beforeRaw, change.afterRaw).added.length > 4" class="text-slate-500">
                                                 +{{ listDiff(change.beforeRaw, change.afterRaw).added.length - 4 }} more
@@ -316,7 +325,7 @@ const exportUrl = computed(() => {
                                                 :key="`${change.key}-removed-${item}`"
                                                 class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700"
                                             >
-                                                {{ item }}
+                                                {{ permissionLabel(item) }}
                                             </span>
                                             <span v-if="listDiff(change.beforeRaw, change.afterRaw).removed.length > 4" class="text-slate-500">
                                                 +{{ listDiff(change.beforeRaw, change.afterRaw).removed.length - 4 }} more
