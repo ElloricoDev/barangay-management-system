@@ -50,7 +50,8 @@ class User extends Authenticatable
     public function roleSlug(): string
     {
         return match ($this->role) {
-            'admin', 'captain' => 'super_admin',
+            'admin' => 'super_admin',
+            'captain', 'chairman', 'chairperson' => 'barangay_chairperson',
             'secretary', 'records_manager' => 'records_administrator',
             'staff', 'frontline_user' => 'staff_user',
             'committee_access' => 'committee_access_user',
@@ -86,6 +87,7 @@ class User extends Authenticatable
     {
         return $this->hasAnyRole([
             'super_admin',
+            'barangay_chairperson',
             'records_administrator',
             'finance_officer',
             'technical_administrator',

@@ -201,6 +201,9 @@ Route::prefix('admin')
         Route::get('/committee-reports', [ProgramsController::class, 'committeeReports'])
             ->middleware('permission:committee_reports.view')
             ->name('committee-reports');
+        Route::get('/committee-reports/export', [ProgramsController::class, 'committeeReportsExport'])
+            ->middleware('permission:committee_reports.view')
+            ->name('committee-reports.export');
         Route::get('/programs-monitoring', [ProgramsController::class, 'monitoring'])
             ->middleware('permission:programs_monitoring.view')
             ->name('programs-monitoring');

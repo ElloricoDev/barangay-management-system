@@ -167,6 +167,7 @@ class UsersController extends Controller
     {
         return [
             'super_admin',
+            'barangay_chairperson',
             'records_administrator',
             'finance_officer',
             'committee_access_user',

@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\BarangayProgram;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProgramsController extends Controller
 {
@@ -53,20 +55,64 @@ class ProgramsController extends Controller
 
     public function committeeReports(Request $request): Response
     {
-        $reports = BarangayProgram::query()
-            ->selectRaw('COALESCE(committee, "Unassigned") as committee')
-            ->selectRaw('COUNT(*) as total_programs')
-            ->selectRaw('SUM(CASE WHEN status = "ongoing" THEN 1 ELSE 0 END) as ongoing_programs')
-            ->selectRaw('SUM(CASE WHEN status = "completed" THEN 1 ELSE 0 END) as completed_programs')
-            ->selectRaw('SUM(COALESCE(participants, 0)) as participants')
-            ->where('category', 'barangay')
-            ->groupBy('committee')
-            ->orderByDesc('total_programs')
-            ->get();
+        $data = $this->committeeReportData($request);
 
         return Inertia::render('Admin/ProgramsModule', [
             'section' => 'committee_reports',
-            'committeeReports' => $reports,
+            'filters' => $data['filters'],
+            'committeeReports' => $data['committeeReports'],
+            'selectedCommitteePrograms' => $data['selectedCommitteePrograms'],
+        ]);
+    }
+
+    public function committeeReportsExport(Request $request): StreamedResponse
+    {
+        $data = $this->committeeReportData($request);
+        $filename = 'committee-reports-'.now()->format('Ymd-His').'.csv';
+
+        return response()->streamDownload(function () use ($data) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, ['Date From', $data['filters']['date_from']]);
+            fputcsv($handle, ['Date To', $data['filters']['date_to']]);
+            fputcsv($handle, ['Status Filter', $data['filters']['status'] !== '' ? $data['filters']['status'] : 'All']);
+            if ($data['filters']['committee'] !== '') {
+                fputcsv($handle, ['Committee Drill-down', $data['filters']['committee']]);
+            }
+
+            fputcsv($handle, []);
+            fputcsv($handle, ['Committee', 'Total Programs', 'Ongoing', 'Completed', 'Participants']);
+            foreach ($data['committeeReports'] as $row) {
+                fputcsv($handle, [
+                    $row['committee'] ?? '',
+                    $row['total_programs'] ?? 0,
+                    $row['ongoing_programs'] ?? 0,
+                    $row['completed_programs'] ?? 0,
+                    $row['participants'] ?? 0,
+                ]);
+            }
+
+            if (! empty($data['selectedCommitteePrograms'])) {
+                fputcsv($handle, []);
+                fputcsv($handle, ['Programs for Committee', $data['filters']['committee']]);
+                fputcsv($handle, ['Title', 'Status', 'Start Date', 'End Date', 'Participants', 'Budget']);
+
+                foreach ($data['selectedCommitteePrograms']['data'] as $program) {
+                    fputcsv($handle, [
+                        $program['title'] ?? '',
+                        $program['status'] ?? '',
+                        $program['start_date'] ?? '',
+                        $program['end_date'] ?? '',
+                        $program['participants'] ?? 0,
+                        $program['budget'] ?? 0,
+                    ]);
+                }
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
@@ -76,21 +122,21 @@ class ProgramsController extends Controller
         $search = trim((string) $request->query('search', ''));
         $sort = (string) $request->query('sort', 'start_date');
         $direction = strtolower((string) $request->query('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
-        $sortable = ['title', 'category', 'status', 'committee', 'start_date', 'end_date', 'participants'];
+        $sortable = ['title', 'status', 'committee', 'start_date', 'end_date', 'participants'];
 
         if (! in_array($sort, $sortable, true)) {
             $sort = 'start_date';
         }
 
         $monitoring = BarangayProgram::query()
+            ->where('category', 'barangay')
             ->when($status !== '', function ($query) use ($status) {
                 $query->where('status', $status);
             })
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('title', 'like', "%{$search}%")
-                        ->orWhere('committee', 'like', "%{$search}%")
-                        ->orWhere('category', 'like', "%{$search}%");
+                        ->orWhere('committee', 'like', "%{$search}%");
                 });
             })
             ->orderBy($sort, $direction)
@@ -198,5 +244,85 @@ class ProgramsController extends Controller
         );
 
         return redirect()->back()->with('success', 'Program/project deleted.');
+    }
+
+    private function committeeReportData(Request $request): array
+    {
+        [$dateFrom, $dateTo] = $this->dateRange($request);
+        $committee = trim((string) $request->query('committee', ''));
+        $status = trim((string) $request->query('status', ''));
+        $allowedStatuses = ['planned', 'ongoing', 'completed', 'cancelled'];
+
+        if (! in_array($status, $allowedStatuses, true)) {
+            $status = '';
+        }
+
+        $base = BarangayProgram::query()
+            ->where('category', 'barangay')
+            ->whereBetween('created_at', [$dateFrom, $dateTo])
+            ->when($status !== '', function ($query) use ($status) {
+                $query->where('status', $status);
+            });
+
+        $reports = (clone $base)
+            ->selectRaw('COALESCE(NULLIF(committee, ""), "Unassigned") as committee')
+            ->selectRaw('COUNT(*) as total_programs')
+            ->selectRaw('SUM(CASE WHEN status = "ongoing" THEN 1 ELSE 0 END) as ongoing_programs')
+            ->selectRaw('SUM(CASE WHEN status = "completed" THEN 1 ELSE 0 END) as completed_programs')
+            ->selectRaw('SUM(COALESCE(participants, 0)) as participants')
+            ->groupBy('committee')
+            ->orderByDesc('total_programs')
+            ->get()
+            ->map(fn ($row) => [
+                'committee' => (string) $row->committee,
+                'total_programs' => (int) $row->total_programs,
+                'ongoing_programs' => (int) $row->ongoing_programs,
+                'completed_programs' => (int) $row->completed_programs,
+                'participants' => (int) $row->participants,
+            ])
+            ->values();
+
+        $selectedCommitteePrograms = null;
+        if ($committee !== '') {
+            $selectedCommitteePrograms = (clone $base)
+                ->when($committee === 'Unassigned', function ($query) {
+                    $query->where(function ($inner) {
+                        $inner->whereNull('committee')->orWhere('committee', '');
+                    });
+                }, function ($query) use ($committee) {
+                    $query->where('committee', $committee);
+                })
+                ->orderByDesc('created_at')
+                ->paginate(10)
+                ->withQueryString();
+        }
+
+        return [
+            'filters' => [
+                'date_from' => $dateFrom->toDateString(),
+                'date_to' => $dateTo->toDateString(),
+                'status' => $status,
+                'committee' => $committee,
+            ],
+            'committeeReports' => $reports,
+            'selectedCommitteePrograms' => $selectedCommitteePrograms,
+        ];
+    }
+
+    private function dateRange(Request $request): array
+    {
+        $dateFrom = $request->query('date_from')
+            ? Carbon::parse((string) $request->query('date_from'))->startOfDay()
+            : now()->subMonths(11)->startOfMonth();
+
+        $dateTo = $request->query('date_to')
+            ? Carbon::parse((string) $request->query('date_to'))->endOfDay()
+            : now()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            [$dateFrom, $dateTo] = [$dateTo->copy()->startOfDay(), $dateFrom->copy()->endOfDay()];
+        }
+
+        return [$dateFrom, $dateTo];
     }
 }

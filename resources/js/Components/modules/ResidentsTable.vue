@@ -15,6 +15,19 @@ defineProps({
 });
 
 const emit = defineEmits(["sort"]);
+
+const formatBirthdate = (value) => {
+    if (!value) return "-";
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return String(value);
+    const [, year, month, day] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+    });
+};
 </script>
 
 <template>
@@ -48,7 +61,7 @@ const emit = defineEmits(["sort"]);
             <tbody>
                 <tr v-for="resident in residents" :key="resident.id">
                     <td>{{ resident.last_name }}, {{ resident.first_name }} {{ resident.middle_name ?? "" }}</td>
-                    <td>{{ resident.birthdate }}</td>
+                    <td>{{ formatBirthdate(resident.birthdate) }}</td>
                     <td>{{ resident.gender }}</td>
                     <td>{{ resident.contact_number ?? "-" }}</td>
                     <td v-if="canEdit">

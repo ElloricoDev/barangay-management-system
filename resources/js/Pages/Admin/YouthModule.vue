@@ -7,6 +7,7 @@ import FlashMessages from "../../Components/ui/FlashMessages.vue";
 import ModalDialog from "../../Components/ui/ModalDialog.vue";
 import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
 import PageHeader from "../../Components/ui/PageHeader.vue";
+import { formatDateOnly } from "../../Utils/dateFormat";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -180,6 +181,19 @@ const confirmDelete = () => {
 const deleteMessage = computed(() =>
     selectedProgram.value ? `Delete ${selectedProgram.value.title}?` : "Delete selected program?"
 );
+
+const formatBirthdate = (value) => {
+    if (!value) return "-";
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return String(value);
+    const [, year, month, day] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+    });
+};
 </script>
 
 <template>
@@ -211,7 +225,7 @@ const deleteMessage = computed(() =>
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
                     <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('last_name')">Name {{ sortIndicator('last_name') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('birthdate')">Birthdate {{ sortIndicator('birthdate') }}</button></th><th class="px-4 py-3 text-left">Gender</th><th class="px-4 py-3 text-left">Contact</th></tr></thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
-                        <tr v-for="resident in props.youthResidents.data" :key="resident.id"><td class="px-4 py-3">{{ resident.last_name }}, {{ resident.first_name }}</td><td class="px-4 py-3">{{ resident.birthdate }}</td><td class="px-4 py-3">{{ resident.gender }}</td><td class="px-4 py-3">{{ resident.contact_number }}</td></tr>
+                        <tr v-for="resident in props.youthResidents.data" :key="resident.id"><td class="px-4 py-3">{{ resident.last_name }}, {{ resident.first_name }}</td><td class="px-4 py-3">{{ formatBirthdate(resident.birthdate) }}</td><td class="px-4 py-3">{{ resident.gender }}</td><td class="px-4 py-3">{{ resident.contact_number }}</td></tr>
                         <tr v-if="props.youthResidents.data.length === 0"><td colspan="4" class="px-4 py-6 text-center text-slate-500">No youth residents found.</td></tr>
                     </tbody>
                 </table>
@@ -247,7 +261,7 @@ const deleteMessage = computed(() =>
                     <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('title')">Title {{ sortIndicator('title') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('status')">Status {{ sortIndicator('status') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('start_date')">Start {{ sortIndicator('start_date') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('participants')">Participants {{ sortIndicator('participants') }}</button></th><th v-if="canManageYouth" class="px-4 py-3 text-left">Actions</th></tr></thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
                         <tr v-for="program in props.youthPrograms.data" :key="program.id">
-                            <td class="px-4 py-3">{{ program.title }}</td><td class="px-4 py-3">{{ program.status }}</td><td class="px-4 py-3">{{ program.start_date ?? '-' }}</td><td class="px-4 py-3">{{ program.participants }}</td>
+                            <td class="px-4 py-3">{{ program.title }}</td><td class="px-4 py-3">{{ program.status }}</td><td class="px-4 py-3">{{ formatDateOnly(program.start_date) }}</td><td class="px-4 py-3">{{ program.participants }}</td>
                             <td v-if="canManageYouth" class="px-4 py-3">
                                 <div class="flex gap-2">
                                     <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs" @click="openEditModal(program)">Edit</button>

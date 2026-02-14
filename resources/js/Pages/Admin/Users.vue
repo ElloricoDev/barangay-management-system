@@ -7,12 +7,14 @@ import FlashMessages from "../../Components/ui/FlashMessages.vue";
 import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
 import PaginationLinks from "../../Components/ui/PaginationLinks.vue";
 import PageHeader from "../../Components/ui/PageHeader.vue";
+import { formatDateTime } from "../../Utils/dateFormat";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
 const currentUserId = computed(() => page.props.auth?.user?.id);
 const roleOptions = [
-    { value: "super_admin", label: "Super Administrator (Punong Barangay)" },
+    { value: "super_admin", label: "Super Administrator (IT / System Owner)" },
+    { value: "barangay_chairperson", label: "Barangay Chairperson (Punong Barangay - Executive)" },
     { value: "records_administrator", label: "Records Administrator (Barangay Secretary)" },
     { value: "finance_officer", label: "Finance Officer (Barangay Treasurer)" },
     { value: "committee_access_user", label: "Committee Access User (Barangay Kagawad)" },
@@ -221,7 +223,7 @@ const resetMessage = computed(() =>
                         <td class="px-4 py-3 text-slate-700">{{ user.name }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ user.email }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ roleLabel(user.role) }}</td>
-                        <td class="px-4 py-3 text-slate-700">{{ user.created_at }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ formatDateTime(user.created_at) }}</td>
                         <td class="px-4 py-3">
                             <div class="flex flex-wrap gap-2">
                                 <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100" @click="openEditModal(user)">

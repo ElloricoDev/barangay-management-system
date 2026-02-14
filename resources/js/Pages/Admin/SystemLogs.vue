@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { Link, router, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
 import PageHeader from "../../Components/ui/PageHeader.vue";
+import { actionLabel, moduleLabel } from "../../Utils/activityLabels";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -72,7 +73,7 @@ const formatDate = (value) => {
                 class="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
             >
                 <option value="">All actions</option>
-                <option v-for="action in props.actions" :key="action" :value="action">{{ action }}</option>
+                <option v-for="action in props.actions" :key="action" :value="action">{{ actionLabel(action) }}</option>
             </select>
             <input
                 name="date_from"
@@ -110,8 +111,8 @@ const formatDate = (value) => {
                             {{ log.user?.name ?? "System" }}
                             <span class="text-xs text-slate-500">{{ log.user?.email ?? "" }}</span>
                         </td>
-                        <td class="px-4 py-3 text-slate-700">{{ log.action }}</td>
-                        <td class="px-4 py-3 text-slate-700">{{ log.auditable_type?.split("\\").pop() }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ actionLabel(log.action) }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ moduleLabel(log.auditable_type) }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ log.auditable_id }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ log.ip_address ?? "-" }}</td>
                     </tr>

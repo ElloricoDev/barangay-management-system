@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { Link, router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
 import { useListQuery } from "../../Composables/useListQuery";
@@ -7,6 +7,7 @@ import FlashMessages from "../../Components/ui/FlashMessages.vue";
 import ModalDialog from "../../Components/ui/ModalDialog.vue";
 import ConfirmActionModal from "../../Components/ui/ConfirmActionModal.vue";
 import PageHeader from "../../Components/ui/PageHeader.vue";
+import { formatDateOnly } from "../../Utils/dateFormat";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -18,7 +19,8 @@ const props = defineProps({
     programs: { type: Object, default: () => ({ data: [], links: [] }) },
     monitoring: { type: Object, default: () => ({ data: [], links: [] }) },
     committeeReports: { type: Array, default: () => [] },
-    filters: { type: Object, default: () => ({ search: "", status: "", sort: "created_at", direction: "desc" }) },
+    selectedCommitteePrograms: { type: Object, default: null },
+    filters: { type: Object, default: () => ({ search: "", status: "", sort: "created_at", direction: "desc", date_from: "", date_to: "", committee: "" }) },
 });
 
 const titles = {
@@ -140,6 +142,63 @@ const confirmDelete = () => {
 const deleteMessage = computed(() =>
     selectedProgram.value ? `Delete ${selectedProgram.value.title}?` : "Delete selected program?"
 );
+
+const committeeDateFrom = ref(props.filters?.date_from ?? "");
+const committeeDateTo = ref(props.filters?.date_to ?? "");
+const committeeStatus = ref(props.filters?.status ?? "");
+
+watch(
+    () => [props.filters?.date_from, props.filters?.date_to, props.filters?.status],
+    ([nextFrom, nextTo, nextStatus]) => {
+        committeeDateFrom.value = nextFrom ?? "";
+        committeeDateTo.value = nextTo ?? "";
+        committeeStatus.value = nextStatus ?? "";
+    }
+);
+
+const committeeExportHref = computed(() => {
+    const params = new URLSearchParams();
+    if (committeeDateFrom.value) params.set("date_from", committeeDateFrom.value);
+    if (committeeDateTo.value) params.set("date_to", committeeDateTo.value);
+    if (committeeStatus.value) params.set("status", committeeStatus.value);
+    if (props.filters?.committee) params.set("committee", props.filters.committee);
+    const query = params.toString();
+    return query ? `/admin/committee-reports/export?${query}` : "/admin/committee-reports/export";
+});
+
+const applyCommitteeFilters = () => {
+    router.get("/admin/committee-reports", {
+        date_from: committeeDateFrom.value || "",
+        date_to: committeeDateTo.value || "",
+        status: committeeStatus.value || "",
+        committee: props.filters?.committee ?? "",
+    }, { preserveState: true, replace: true });
+};
+
+const resetCommitteeFilters = () => {
+    committeeDateFrom.value = "";
+    committeeDateTo.value = "";
+    committeeStatus.value = "";
+    router.get("/admin/committee-reports", {}, { preserveState: true, replace: true });
+};
+
+const openCommittee = (committee) => {
+    router.get("/admin/committee-reports", {
+        date_from: committeeDateFrom.value || "",
+        date_to: committeeDateTo.value || "",
+        status: committeeStatus.value || "",
+        committee,
+    }, { preserveState: true, replace: true });
+};
+
+const clearCommittee = () => {
+    router.get("/admin/committee-reports", {
+        date_from: committeeDateFrom.value || "",
+        date_to: committeeDateTo.value || "",
+        status: committeeStatus.value || "",
+        committee: "",
+    }, { preserveState: true, replace: true });
+};
 </script>
 
 <template>
@@ -177,7 +236,7 @@ const deleteMessage = computed(() =>
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
                     <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('title')">Title {{ sortIndicator('title') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('committee')">Committee {{ sortIndicator('committee') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('status')">Status {{ sortIndicator('status') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('start_date')">Start {{ sortIndicator('start_date') }}</button></th><th v-if="canManagePrograms" class="px-4 py-3 text-left">Actions</th></tr></thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
-                        <tr v-for="program in props.programs.data" :key="program.id"><td class="px-4 py-3">{{ program.title }}</td><td class="px-4 py-3">{{ program.committee ?? '-' }}</td><td class="px-4 py-3">{{ program.status }}</td><td class="px-4 py-3">{{ program.start_date ?? '-' }}</td><td v-if="canManagePrograms" class="px-4 py-3"><div class="flex gap-2"><button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs" @click="openEditModal(program)">Edit</button><button type="button" class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700" @click="openDeleteModal(program)">Delete</button></div></td></tr>
+                        <tr v-for="program in props.programs.data" :key="program.id"><td class="px-4 py-3">{{ program.title }}</td><td class="px-4 py-3">{{ program.committee ?? '-' }}</td><td class="px-4 py-3">{{ program.status }}</td><td class="px-4 py-3">{{ formatDateOnly(program.start_date) }}</td><td v-if="canManagePrograms" class="px-4 py-3"><div class="flex gap-2"><button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-xs" @click="openEditModal(program)">Edit</button><button type="button" class="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700" @click="openDeleteModal(program)">Delete</button></div></td></tr>
                         <tr v-if="props.programs.data.length === 0"><td :colspan="canManagePrograms ? 5 : 4" class="px-4 py-6 text-center text-slate-500">No programs found.</td></tr>
                     </tbody>
                 </table>
@@ -186,14 +245,91 @@ const deleteMessage = computed(() =>
         </template>
 
         <template v-else-if="props.section === 'committee_reports'">
-            <div class="overflow-x-auto rounded-lg border border-slate-200">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left">Committee</th><th class="px-4 py-3 text-left">Total Programs</th><th class="px-4 py-3 text-left">Ongoing</th><th class="px-4 py-3 text-left">Completed</th><th class="px-4 py-3 text-left">Participants</th></tr></thead>
+            <div class="mb-3 flex flex-wrap items-end gap-2">
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-600">Date From</label>
+                    <input v-model="committeeDateFrom" type="date" class="rounded-md border border-slate-300 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-600">Date To</label>
+                    <input v-model="committeeDateTo" type="date" class="rounded-md border border-slate-300 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-600">Status</label>
+                    <select v-model="committeeStatus" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <option value="">All status</option>
+                        <option value="planned">planned</option>
+                        <option value="ongoing">ongoing</option>
+                        <option value="completed">completed</option>
+                        <option value="cancelled">cancelled</option>
+                    </select>
+                </div>
+                <button type="button" class="ui-btn ui-btn--primary" @click="applyCommitteeFilters">Apply</button>
+                <button type="button" class="ui-btn ui-btn--ghost" @click="resetCommitteeFilters">Reset</button>
+                <a :href="committeeExportHref" class="ui-btn ui-btn--ghost">Export CSV</a>
+            </div>
+
+            <div class="ui-table-wrap">
+                <table class="ui-table">
+                    <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left">Committee</th><th class="px-4 py-3 text-left">Total Programs</th><th class="px-4 py-3 text-left">Ongoing</th><th class="px-4 py-3 text-left">Completed</th><th class="px-4 py-3 text-left">Participants</th><th class="px-4 py-3 text-left">Action</th></tr></thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
-                        <tr v-for="row in props.committeeReports" :key="row.committee"><td class="px-4 py-3">{{ row.committee }}</td><td class="px-4 py-3">{{ row.total_programs }}</td><td class="px-4 py-3">{{ row.ongoing_programs }}</td><td class="px-4 py-3">{{ row.completed_programs }}</td><td class="px-4 py-3">{{ row.participants }}</td></tr>
-                        <tr v-if="props.committeeReports.length === 0"><td colspan="5" class="px-4 py-6 text-center text-slate-500">No committee data.</td></tr>
+                        <tr v-for="row in props.committeeReports" :key="row.committee">
+                            <td class="px-4 py-3">{{ row.committee }}</td>
+                            <td class="px-4 py-3">{{ row.total_programs }}</td>
+                            <td class="px-4 py-3">{{ row.ongoing_programs }}</td>
+                            <td class="px-4 py-3">{{ row.completed_programs }}</td>
+                            <td class="px-4 py-3">{{ row.participants }}</td>
+                            <td class="px-4 py-3">
+                                <button type="button" class="ui-btn ui-btn--ghost px-2 py-1 text-xs" @click="openCommittee(row.committee)">View Programs</button>
+                            </td>
+                        </tr>
+                        <tr v-if="props.committeeReports.length === 0"><td colspan="6" class="px-4 py-6 text-center text-slate-500">No committee data.</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div v-if="props.filters?.committee" class="mt-4">
+                <div class="mb-2 flex items-center justify-between gap-2">
+                    <h3 class="text-base font-semibold text-slate-800">Programs for {{ props.filters.committee }}</h3>
+                    <button type="button" class="ui-btn ui-btn--ghost px-2 py-1 text-xs" @click="clearCommittee">Clear Drill-down</button>
+                </div>
+                <div class="ui-table-wrap">
+                    <table class="ui-table">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Title</th>
+                                <th class="px-4 py-3 text-left">Status</th>
+                                <th class="px-4 py-3 text-left">Start</th>
+                                <th class="px-4 py-3 text-left">End</th>
+                                <th class="px-4 py-3 text-left">Participants</th>
+                                <th class="px-4 py-3 text-left">Budget</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            <tr v-for="item in props.selectedCommitteePrograms?.data ?? []" :key="item.id">
+                                <td class="px-4 py-3">{{ item.title }}</td>
+                                <td class="px-4 py-3">{{ item.status }}</td>
+                                <td class="px-4 py-3">{{ formatDateOnly(item.start_date) }}</td>
+                                <td class="px-4 py-3">{{ formatDateOnly(item.end_date) }}</td>
+                                <td class="px-4 py-3">{{ item.participants ?? 0 }}</td>
+                                <td class="px-4 py-3">{{ item.budget ?? 0 }}</td>
+                            </tr>
+                            <tr v-if="(props.selectedCommitteePrograms?.data ?? []).length === 0">
+                                <td colspan="6" class="px-4 py-6 text-center text-slate-500">No programs for selected committee in this date range.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <Link
+                        v-for="link in props.selectedCommitteePrograms?.links ?? []"
+                        :key="link.label"
+                        :href="link.url || '#'"
+                        class="rounded-md border px-3 py-1 text-sm"
+                        :class="[link.active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700', !link.url ? 'pointer-events-none opacity-50' : '']"
+                        v-html="link.label"
+                    />
+                </div>
             </div>
         </template>
 
@@ -206,10 +342,10 @@ const deleteMessage = computed(() =>
             </div>
             <div class="overflow-x-auto rounded-lg border border-slate-200">
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('title')">Title {{ sortIndicator('title') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('category')">Category</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('status')">Status {{ sortIndicator('status') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('committee')">Committee {{ sortIndicator('committee') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('start_date')">Start {{ sortIndicator('start_date') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('end_date')">End {{ sortIndicator('end_date') }}</button></th></tr></thead>
+                    <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('title')">Title {{ sortIndicator('title') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('status')">Status {{ sortIndicator('status') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('committee')">Committee {{ sortIndicator('committee') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('start_date')">Start {{ sortIndicator('start_date') }}</button></th><th class="px-4 py-3 text-left"><button type="button" @click="sortBy('end_date')">End {{ sortIndicator('end_date') }}</button></th></tr></thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
-                        <tr v-for="item in props.monitoring.data" :key="item.id"><td class="px-4 py-3">{{ item.title }}</td><td class="px-4 py-3">{{ item.category }}</td><td class="px-4 py-3">{{ item.status }}</td><td class="px-4 py-3">{{ item.committee ?? '-' }}</td><td class="px-4 py-3">{{ item.start_date ?? '-' }}</td><td class="px-4 py-3">{{ item.end_date ?? '-' }}</td></tr>
-                        <tr v-if="props.monitoring.data.length === 0"><td colspan="6" class="px-4 py-6 text-center text-slate-500">No monitoring data.</td></tr>
+                        <tr v-for="item in props.monitoring.data" :key="item.id"><td class="px-4 py-3">{{ item.title }}</td><td class="px-4 py-3">{{ item.status }}</td><td class="px-4 py-3">{{ item.committee ?? '-' }}</td><td class="px-4 py-3">{{ formatDateOnly(item.start_date) }}</td><td class="px-4 py-3">{{ formatDateOnly(item.end_date) }}</td></tr>
+                        <tr v-if="props.monitoring.data.length === 0"><td colspan="5" class="px-4 py-6 text-center text-slate-500">No monitoring data.</td></tr>
                     </tbody>
                 </table>
             </div>

@@ -1,8 +1,10 @@
 <script setup>
-import { computed, reactive } from "vue";
+import { computed, reactive, ref } from "vue";
 import { Link, router, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
 import PageHeader from "../../Components/ui/PageHeader.vue";
+import ModalDialog from "../../Components/ui/ModalDialog.vue";
+import { actionLabel, moduleLabel } from "../../Utils/activityLabels";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -36,6 +38,8 @@ const form = reactive({
     date_to: props.filters?.date_to ?? "",
 });
 
+const selectedLog = ref(null);
+
 const applyFilters = () => {
     router.get("/admin/audit-logs", form, { preserveState: true, replace: true });
 };
@@ -47,12 +51,6 @@ const resetFilters = () => {
     form.date_from = "";
     form.date_to = "";
     router.get("/admin/audit-logs", {}, { preserveState: true, replace: true });
-};
-
-const moduleLabel = (auditableType) => {
-    if (!auditableType) return "-";
-    const parts = auditableType.split("\\");
-    return parts[parts.length - 1];
 };
 
 const formatDate = (value) => {
@@ -67,6 +65,11 @@ const formatDate = (value) => {
         hour: "numeric",
         minute: "2-digit",
     }).format(date);
+};
+
+const isDateOnlyString = (value) => {
+    if (typeof value !== "string") return false;
+    return /^\d{4}-\d{2}-\d{2}$/.test(value);
 };
 
 const isSensitiveKey = (key) => {
@@ -91,14 +94,44 @@ const formatFieldLabel = (key) => {
 const formatValue = (key, value) => {
     if (isSensitiveKey(key)) return "[MASKED]";
     if (value === null || value === undefined) return "-";
+    if (typeof value === "boolean") return value ? "Yes" : "No";
+    if (isDateOnlyString(value)) {
+        const [year, month, day] = value.split("-");
+        const date = new Date(Number(year), Number(month) - 1, Number(day));
+        return date.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
+    }
     if (isIsoDateString(value)) return formatDate(value);
+    if (Array.isArray(value)) return value.map((item) => formatValue(key, item)).join(", ");
     if (typeof value === "object") return JSON.stringify(value);
     return String(value);
 };
 
+const normalizeChangePayload = (payload) => {
+    if (!payload) return {};
+    if (typeof payload === "object" && !Array.isArray(payload)) return payload;
+
+    if (typeof payload === "string") {
+        try {
+            const parsed = JSON.parse(payload);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                return parsed;
+            }
+            return { value: parsed };
+        } catch {
+            return { value: payload };
+        }
+    }
+
+    return { value: payload };
+};
+
 const changedFields = (log) => {
-    const before = log.before ?? {};
-    const after = log.after ?? {};
+    const before = normalizeChangePayload(log.before);
+    const after = normalizeChangePayload(log.after);
     const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
 
     return keys
@@ -106,9 +139,47 @@ const changedFields = (log) => {
         .map((key) => ({
             key,
             label: formatFieldLabel(key),
+            beforeRaw: before[key],
+            afterRaw: after[key],
             before: formatValue(key, before[key]),
             after: formatValue(key, after[key]),
         }));
+};
+
+const toStringList = (value) => {
+    if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+    if (typeof value === "string") {
+        return value
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+    return [];
+};
+
+const listDiff = (beforeValue, afterValue) => {
+    const beforeSet = new Set(toStringList(beforeValue));
+    const afterSet = new Set(toStringList(afterValue));
+    const added = Array.from(afterSet).filter((item) => !beforeSet.has(item));
+    const removed = Array.from(beforeSet).filter((item) => !afterSet.has(item));
+    return { added, removed };
+};
+
+const isPermissionField = (key) => {
+    const normalized = String(key ?? "").toLowerCase();
+    return normalized === "permissions" || normalized.endsWith("_permissions");
+};
+
+const compactChanges = (log) => {
+    return changedFields(log).slice(0, 2);
+};
+
+const openDetails = (log) => {
+    selectedLog.value = log;
+};
+
+const closeDetails = () => {
+    selectedLog.value = null;
 };
 
 const exportUrl = computed(() => {
@@ -147,7 +218,7 @@ const exportUrl = computed(() => {
                 >
                     <option value="">All actions</option>
                     <option v-for="action in props.availableActions" :key="action" :value="action">
-                        {{ action }}
+                        {{ actionLabel(action) }}
                     </option>
                 </select>
 
@@ -217,22 +288,64 @@ const exportUrl = computed(() => {
                             {{ log.user?.name ?? "System" }}
                             <span v-if="log.user?.email" class="text-xs text-slate-500">({{ log.user.email }})</span>
                         </td>
-                        <td class="px-4 py-3 text-slate-700">{{ log.action }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ actionLabel(log.action) }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ moduleLabel(log.auditable_type) }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ log.auditable_id }}</td>
                         <td class="px-4 py-3 text-slate-700">
-                            <div v-if="changedFields(log).length > 0" class="space-y-1 text-xs">
-                                <div v-for="change in changedFields(log)" :key="change.key" class="rounded border border-slate-200 bg-slate-50 px-2 py-1">
-                                    <div class="mb-1 font-semibold text-slate-700">{{ change.label }}</div>
-                                    <div class="grid gap-1">
-                                        <div class="rounded bg-rose-50 px-2 py-1 text-rose-700">
+                            <div v-if="changedFields(log).length > 0" class="space-y-2 text-xs">
+                                <div v-for="change in compactChanges(log)" :key="change.key" class="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
+                                    <p class="font-semibold text-slate-700">{{ change.label }}</p>
+                                    <div v-if="isPermissionField(change.key)" class="mt-1 space-y-1">
+                                        <div v-if="listDiff(change.beforeRaw, change.afterRaw).added.length > 0" class="flex flex-wrap gap-1">
+                                            <span class="text-slate-500">+ Added:</span>
+                                            <span
+                                                v-for="item in listDiff(change.beforeRaw, change.afterRaw).added.slice(0, 4)"
+                                                :key="`${change.key}-added-${item}`"
+                                                class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                                            >
+                                                {{ item }}
+                                            </span>
+                                            <span v-if="listDiff(change.beforeRaw, change.afterRaw).added.length > 4" class="text-slate-500">
+                                                +{{ listDiff(change.beforeRaw, change.afterRaw).added.length - 4 }} more
+                                            </span>
+                                        </div>
+                                        <div v-if="listDiff(change.beforeRaw, change.afterRaw).removed.length > 0" class="flex flex-wrap gap-1">
+                                            <span class="text-slate-500">- Removed:</span>
+                                            <span
+                                                v-for="item in listDiff(change.beforeRaw, change.afterRaw).removed.slice(0, 4)"
+                                                :key="`${change.key}-removed-${item}`"
+                                                class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700"
+                                            >
+                                                {{ item }}
+                                            </span>
+                                            <span v-if="listDiff(change.beforeRaw, change.afterRaw).removed.length > 4" class="text-slate-500">
+                                                +{{ listDiff(change.beforeRaw, change.afterRaw).removed.length - 4 }} more
+                                            </span>
+                                        </div>
+                                        <p
+                                            v-if="listDiff(change.beforeRaw, change.afterRaw).added.length === 0 && listDiff(change.beforeRaw, change.afterRaw).removed.length === 0"
+                                            class="text-slate-500"
+                                        >
+                                            Updated list values.
+                                        </p>
+                                    </div>
+                                    <div v-else class="mt-1 space-y-1">
+                                        <p class="rounded bg-rose-50 px-2 py-1 text-rose-700">
                                             <span class="font-medium">Before:</span> {{ change.before }}
-                                        </div>
-                                        <div class="rounded bg-emerald-50 px-2 py-1 text-emerald-700">
+                                        </p>
+                                        <p class="rounded bg-emerald-50 px-2 py-1 text-emerald-700">
                                             <span class="font-medium">After:</span> {{ change.after }}
-                                        </div>
+                                        </p>
                                     </div>
                                 </div>
+                                <button
+                                    v-if="changedFields(log).length > 2"
+                                    type="button"
+                                    class="text-xs font-medium text-slate-600 hover:underline"
+                                    @click="openDetails(log)"
+                                >
+                                    View all {{ changedFields(log).length }} changes
+                                </button>
                             </div>
                             <div v-else class="text-xs text-slate-500">
                                 No field changes captured.
@@ -259,5 +372,21 @@ const exportUrl = computed(() => {
                 v-html="link.label"
             />
         </div>
+
+        <ModalDialog :show="!!selectedLog" title="Audit Change Details" max-width-class="max-w-4xl" @close="closeDetails">
+            <div v-if="selectedLog" class="space-y-2 text-xs">
+                <div v-for="change in changedFields(selectedLog)" :key="change.key" class="rounded border border-slate-200 bg-slate-50 p-2">
+                    <p class="mb-1 font-semibold text-slate-700">{{ change.label }}</p>
+                    <div class="grid gap-1">
+                        <div class="rounded bg-rose-50 px-2 py-1 text-rose-700">
+                            <span class="font-medium">Before:</span> {{ change.before }}
+                        </div>
+                        <div class="rounded bg-emerald-50 px-2 py-1 text-emerald-700">
+                            <span class="font-medium">After:</span> {{ change.after }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </ModalDialog>
     </AdminLayout>
 </template>

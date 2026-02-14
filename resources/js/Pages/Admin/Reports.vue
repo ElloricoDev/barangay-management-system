@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
 import AdminLayout from "../../Layouts/AdminLayout.vue";
 import PageHeader from "../../Components/ui/PageHeader.vue";
+import { actionLabel, moduleLabel } from "../../Utils/activityLabels";
 
 const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
@@ -116,8 +117,8 @@ const formatDate = (value) => {
                         <tr v-for="row in props.recentActivity" :key="row.id">
                             <td class="px-3 py-2 text-slate-700">{{ formatDate(row.created_at) }}</td>
                             <td class="px-3 py-2 text-slate-700">{{ row.user?.name ?? "System" }}</td>
-                            <td class="px-3 py-2 text-slate-700">{{ row.action }}</td>
-                            <td class="px-3 py-2 text-slate-700">{{ row.auditable_type?.split('\\').pop() }}</td>
+                            <td class="px-3 py-2 text-slate-700">{{ actionLabel(row.action) }}</td>
+                            <td class="px-3 py-2 text-slate-700">{{ moduleLabel(row.auditable_type) }}</td>
                         </tr>
                         <tr v-if="props.recentActivity.length === 0"><td colspan="4" class="px-3 py-5 text-center text-slate-500">No activity in selected range.</td></tr>
                     </tbody>

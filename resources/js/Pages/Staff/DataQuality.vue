@@ -98,6 +98,19 @@ const formatDate = (value) => {
         minute: "2-digit",
     });
 };
+
+const formatBirthdate = (value) => {
+    if (!value) return "-";
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return String(value);
+    const [, year, month, day] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+    });
+};
 </script>
 
 <template>
@@ -158,7 +171,7 @@ const formatDate = (value) => {
                         <td class="px-4 py-3 text-slate-700">
                             {{ resident.last_name }}, {{ resident.first_name }} {{ resident.middle_name ?? "" }}
                         </td>
-                        <td class="px-4 py-3 text-slate-700">{{ resident.birthdate }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ formatBirthdate(resident.birthdate) }}</td>
                         <td class="px-4 py-3 text-slate-700">{{ resident.contact_number ?? "-" }}</td>
                         <td class="px-4 py-3">
                             <span
