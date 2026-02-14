@@ -25,6 +25,7 @@ export const actionLabel = (action) => {
         restore: "Restored",
         reset: "Reset",
         toggle: "Toggled",
+        adjust: "Adjusted",
         login: "Logged In",
         logout: "Logged Out",
         record: "Recorded",

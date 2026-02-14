@@ -28,6 +28,7 @@ return [
             'finance.record',
             'finance.receipts',
             'finance.reports.export',
+            'finance.funds.adjust',
             'payment_processing.view',
             'official_receipts.view',
             'collection_reports.view',
@@ -118,6 +119,7 @@ return [
             'finance.record',
             'finance.receipts',
             'finance.reports.export',
+            'finance.funds.adjust',
             'reports.view',
         ],
         'committee_access_user' => [

@@ -132,6 +132,9 @@ Route::prefix('admin')
         Route::get('/financial-management', [FinancialManagementController::class, 'financialManagement'])
             ->middleware('permission:financial_management.view')
             ->name('financial-management');
+        Route::post('/financial-management/adjust-funds', [FinancialManagementController::class, 'adjustFunds'])
+            ->middleware('permission:finance.funds.adjust')
+            ->name('financial-management.adjust-funds');
         Route::get('/payment-processing', [FinancialManagementController::class, 'paymentProcessing'])
             ->middleware('permission:payment_processing.view')
             ->name('payment-processing');

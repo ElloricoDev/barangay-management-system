@@ -26,6 +26,7 @@ class SystemSettingsController extends Controller
             'contact_number' => ['nullable', 'string', 'max:50'],
             'contact_email' => ['nullable', 'email', 'max:255'],
             'receipt_prefix' => ['required', 'string', 'max:20'],
+            'barangay_funds' => ['nullable', 'numeric', 'min:0'],
             'timezone' => ['required', 'string', 'max:100'],
             'maintenance_mode' => ['boolean'],
             'login_theme' => ['nullable', 'in:emerald,teal,blue,rose,amber'],
@@ -40,6 +41,7 @@ class SystemSettingsController extends Controller
             'contact_number',
             'contact_email',
             'receipt_prefix',
+            'barangay_funds',
             'timezone',
             'maintenance_mode',
             'login_theme',
@@ -48,6 +50,7 @@ class SystemSettingsController extends Controller
 
         $settings->update([
             ...$validated,
+            'barangay_funds' => (float) ($validated['barangay_funds'] ?? 0),
             'maintenance_mode' => (bool) ($validated['maintenance_mode'] ?? false),
             'login_theme' => $validated['login_theme'] ?? 'emerald',
             'updated_by' => $request->user()->id,
@@ -66,6 +69,7 @@ class SystemSettingsController extends Controller
                 'contact_number',
                 'contact_email',
                 'receipt_prefix',
+                'barangay_funds',
                 'timezone',
                 'maintenance_mode',
                 'login_theme',

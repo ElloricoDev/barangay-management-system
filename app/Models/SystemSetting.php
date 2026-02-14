@@ -15,6 +15,7 @@ class SystemSetting extends Model
         'contact_number',
         'contact_email',
         'receipt_prefix',
+        'barangay_funds',
         'timezone',
         'maintenance_mode',
         'login_theme',
@@ -26,6 +27,7 @@ class SystemSetting extends Model
     {
         return [
             'maintenance_mode' => 'boolean',
+            'barangay_funds' => 'decimal:2',
         ];
     }
 
@@ -36,6 +38,7 @@ class SystemSetting extends Model
                 'barangay_name' => 'Barangay Management System',
                 'timezone' => 'Asia/Manila',
                 'receipt_prefix' => 'OR',
+                'barangay_funds' => 0,
                 'maintenance_mode' => false,
                 'login_theme' => 'emerald',
             ]);
@@ -48,6 +51,7 @@ class SystemSetting extends Model
                     'barangay_name' => 'Barangay Management System',
                     'timezone' => 'Asia/Manila',
                     'receipt_prefix' => 'OR',
+                    'barangay_funds' => 0,
                     'maintenance_mode' => false,
                     'login_theme' => 'emerald',
                 ]
@@ -57,6 +61,7 @@ class SystemSetting extends Model
                 'barangay_name' => 'Barangay Management System',
                 'timezone' => 'Asia/Manila',
                 'receipt_prefix' => 'OR',
+                'barangay_funds' => 0,
                 'maintenance_mode' => false,
                 'login_theme' => 'emerald',
             ]);

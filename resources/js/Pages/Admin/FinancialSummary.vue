@@ -10,7 +10,19 @@ const page = usePage();
 const userName = computed(() => page.props.auth?.user?.name ?? "Admin");
 
 const props = defineProps({
-    summary: { type: Object, default: () => ({ total_collections: 0, transactions_count: 0, today_collections: 0 }) },
+    summary: {
+        type: Object,
+        default: () => ({
+            barangay_funds: 0,
+            total_collections: 0,
+            total_credits: 0,
+            total_debits: 0,
+            net_adjustments: 0,
+            available_funds: 0,
+            transactions_count: 0,
+            today_collections: 0,
+        }),
+    },
     serviceTotals: { type: Array, default: () => [] },
     monthlyTotals: { type: Array, default: () => [] },
 });
@@ -27,8 +39,13 @@ const formatMoney = (value) =>
 
         <FlashMessages :flash="page.props.flash" />
 
-        <div class="grid gap-4 md:grid-cols-3">
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <DashboardStatCard label="Opening Funds" :value="formatMoney(props.summary.barangay_funds)" />
             <DashboardStatCard label="Total Collections" :value="formatMoney(props.summary.total_collections)" />
+            <DashboardStatCard label="Fund Credits" :value="formatMoney(props.summary.total_credits)" />
+            <DashboardStatCard label="Fund Debits" :value="formatMoney(props.summary.total_debits)" />
+            <DashboardStatCard label="Net Adjustments" :value="formatMoney(props.summary.net_adjustments)" />
+            <DashboardStatCard label="Available Funds" :value="formatMoney(props.summary.available_funds)" />
             <DashboardStatCard label="Transactions" :value="props.summary.transactions_count" />
             <DashboardStatCard label="Today Collections" :value="formatMoney(props.summary.today_collections)" />
         </div>

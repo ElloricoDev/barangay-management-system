@@ -22,6 +22,7 @@ const form = useForm({
     contact_number: props.settings.contact_number ?? "",
     contact_email: props.settings.contact_email ?? "",
     receipt_prefix: props.settings.receipt_prefix ?? "OR",
+    barangay_funds: Number(props.settings.barangay_funds ?? 0),
     timezone: props.settings.timezone ?? "Asia/Manila",
     maintenance_mode: !!props.settings.maintenance_mode,
     login_theme: props.settings.login_theme ?? "emerald",
@@ -73,6 +74,12 @@ const save = () => {
                 <label class="mb-1 block text-sm font-medium text-slate-700">Receipt Prefix</label>
                 <input v-model="form.receipt_prefix" type="text" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
                 <p v-if="form.errors.receipt_prefix" class="mt-1 text-xs text-rose-600">{{ form.errors.receipt_prefix }}</p>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-slate-700">Opening Funds (PHP)</label>
+                <input v-model="form.barangay_funds" type="number" min="0" step="0.01" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+                <p class="mt-1 text-xs text-slate-500">Set the baseline starting balance. Use Financial Management to add credit/debit adjustments over time.</p>
+                <p v-if="form.errors.barangay_funds" class="mt-1 text-xs text-rose-600">{{ form.errors.barangay_funds }}</p>
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700">Timezone</label>

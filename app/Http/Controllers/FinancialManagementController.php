@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FundAdjustment;
 use App\Models\Payment;
 use App\Models\Resident;
 use App\Models\SystemSetting;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,7 +26,72 @@ class FinancialManagementController extends Controller
                 ->orderByDesc('paid_at')
                 ->limit(8)
                 ->get(),
+            'recentFundAdjustments' => FundAdjustment::query()
+                ->with('adjustedBy:id,name')
+                ->latest('adjusted_at')
+                ->limit(10)
+                ->get(),
         ]);
+    }
+
+    public function adjustFunds(Request $request)
+    {
+        $validated = $request->validate([
+            'adjustment_type' => ['required', Rule::in(['credit', 'debit'])],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'reason' => ['required', 'string', 'max:255'],
+            'reference_no' => ['nullable', 'string', 'max:100'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $amount = (float) $validated['amount'];
+        $adjustment = null;
+        $beforeBalances = [];
+        $afterBalances = [];
+
+        DB::transaction(function () use ($validated, $amount, $request, &$adjustment, &$beforeBalances, &$afterBalances) {
+            $beforeBalances = $this->balances();
+            $isDebit = $validated['adjustment_type'] === 'debit';
+
+            if ($isDebit && $amount > $beforeBalances['available_funds']) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Debit adjustment exceeds available funds.',
+                ]);
+            }
+
+            $adjustment = FundAdjustment::create([
+                'adjustment_type' => $validated['adjustment_type'],
+                'amount' => $amount,
+                'reason' => $validated['reason'],
+                'reference_no' => $validated['reference_no'] ?? null,
+                'remarks' => $validated['remarks'] ?? null,
+                'adjusted_by' => $request->user()->id,
+                'adjusted_at' => now(),
+            ]);
+
+            $afterBalances = $this->balances();
+        });
+
+        AuditLogger::log(
+            $request,
+            'finance.funds.adjust',
+            FundAdjustment::class,
+            $adjustment->id,
+            [
+                'available_funds' => $beforeBalances['available_funds'],
+                'net_adjustments' => $beforeBalances['net_adjustments'],
+            ],
+            [
+                'adjustment_type' => $adjustment->adjustment_type,
+                'amount' => (float) $adjustment->amount,
+                'reason' => $adjustment->reason,
+                'reference_no' => $adjustment->reference_no,
+                'available_funds' => $afterBalances['available_funds'],
+                'net_adjustments' => $afterBalances['net_adjustments'],
+            ]
+        );
+
+        return redirect()->back()->with('success', 'Funds adjusted successfully.');
     }
 
     public function paymentProcessing(Request $request): Response
@@ -127,7 +195,9 @@ class FinancialManagementController extends Controller
 
     public function exportCsv(Request $request): StreamedResponse
     {
-        $payments = $this->buildFilteredQuery($request)
+        $filters = $this->extractFilters($request, 'paid_at');
+
+        $payments = $this->buildFilteredQuery($filters)
             ->with([
                 'resident:id,first_name,last_name',
                 'collector:id,name',
@@ -282,9 +352,17 @@ class FinancialManagementController extends Controller
     private function buildSummary(string $search): array
     {
         $summaryQuery = $this->applySearch(Payment::query(), $search);
+        $baseFunds = (float) (SystemSetting::current()->barangay_funds ?? 0);
+        $collections = (float) $summaryQuery->sum('amount');
+        $balances = $this->balances();
 
         return [
-            'total_collections' => (float) $summaryQuery->sum('amount'),
+            'barangay_funds' => $baseFunds,
+            'total_collections' => $collections,
+            'total_credits' => $balances['credits_total'],
+            'total_debits' => $balances['debits_total'],
+            'net_adjustments' => $balances['net_adjustments'],
+            'available_funds' => $balances['available_funds'],
             'transactions_count' => (int) $summaryQuery->count(),
             'today_collections' => (float) Payment::query()
                 ->whereDate('paid_at', now()->toDateString())
@@ -343,5 +421,27 @@ class FinancialManagementController extends Controller
                     });
             });
         });
+    }
+
+    private function balances(): array
+    {
+        $baseFunds = (float) (SystemSetting::current()->barangay_funds ?? 0);
+        $totalCollections = (float) Payment::query()->sum('amount');
+        $credits = (float) FundAdjustment::query()
+            ->where('adjustment_type', 'credit')
+            ->sum('amount');
+        $debits = (float) FundAdjustment::query()
+            ->where('adjustment_type', 'debit')
+            ->sum('amount');
+        $netAdjustments = $credits - $debits;
+
+        return [
+            'base_funds' => $baseFunds,
+            'collections_total' => $totalCollections,
+            'credits_total' => $credits,
+            'debits_total' => $debits,
+            'net_adjustments' => $netAdjustments,
+            'available_funds' => $baseFunds + $netAdjustments + $totalCollections,
+        ];
     }
 }
