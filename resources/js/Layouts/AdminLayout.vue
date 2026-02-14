@@ -29,6 +29,7 @@ const navItems = computed(() => [
     { href: "/admin/collection-reports", label: "Collection Reports", icon: "collection", show: hasPermission("collection_reports.view") },
     { href: "/admin/transaction-history", label: "Transaction History", icon: "transactions", show: hasPermission("transaction_history.view") },
     { href: "/admin/financial-summary", label: "Financial Summary", icon: "summary", show: hasPermission("financial_summary.view") },
+    { href: "/admin/financial-statements", label: "Financial Statements", icon: "reports", show: hasPermission("finance.statements.view") },
     { href: "/admin/youth-management", label: "Youth Management", icon: "youth", show: hasPermission("youth_management.view") },
     { href: "/admin/youth-residents", label: "Youth Residents", icon: "residents", show: hasPermission("youth_residents.view") },
     { href: "/admin/youth-programs", label: "Youth Programs", icon: "projects", show: hasPermission("youth_programs.view") },

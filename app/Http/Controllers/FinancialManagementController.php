@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\Resident;
 use App\Models\SystemSetting;
 use App\Support\AuditLogger;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -614,6 +615,147 @@ class FinancialManagementController extends Controller
         ]);
     }
 
+    public function financialStatements(Request $request): Response
+    {
+        $filters = $this->extractStatementFilters($request);
+        [$dateFrom, $dateTo] = $this->statementDateRange($filters);
+
+        return Inertia::render('Admin/FinancialStatements', [
+            'filters' => [
+                'date_from' => $dateFrom->toDateString(),
+                'date_to' => $dateTo->toDateString(),
+                'statement' => $filters['statement'],
+            ],
+            'trialBalance' => $this->buildTrialBalance($dateFrom, $dateTo),
+            'statementOfExpenditures' => $this->buildStatementOfExpenditures($dateFrom, $dateTo),
+            'cashReceiptsDisbursements' => $this->buildCashReceiptsDisbursements($dateFrom, $dateTo),
+        ]);
+    }
+
+    public function exportFinancialStatements(Request $request): StreamedResponse
+    {
+        $filters = $this->extractStatementFilters($request);
+        [$dateFrom, $dateTo] = $this->statementDateRange($filters);
+
+        $statement = in_array($filters['statement'], ['all', 'trial_balance', 'statement_of_expenditures', 'cash_receipts_disbursements'], true)
+            ? $filters['statement']
+            : 'all';
+
+        $trialBalance = $this->buildTrialBalance($dateFrom, $dateTo);
+        $statementOfExpenditures = $this->buildStatementOfExpenditures($dateFrom, $dateTo);
+        $cashReceiptsDisbursements = $this->buildCashReceiptsDisbursements($dateFrom, $dateTo);
+
+        $filename = 'financial-statements-'.$statement.'-'.now()->format('Ymd-His').'.csv';
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        return response()->streamDownload(function () use (
+            $statement,
+            $dateFrom,
+            $dateTo,
+            $trialBalance,
+            $statementOfExpenditures,
+            $cashReceiptsDisbursements
+        ) {
+            $format = fn ($value) => number_format((float) $value, 2, '.', '');
+
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, ['Barangay Financial Statements']);
+            fputcsv($handle, ['Period', $dateFrom->toDateString().' to '.$dateTo->toDateString()]);
+            fputcsv($handle, []);
+
+            if (in_array($statement, ['all', 'trial_balance'], true)) {
+                fputcsv($handle, ['Trial Balance']);
+                fputcsv($handle, ['Account', 'Debit', 'Credit', 'Transactions']);
+                foreach ($trialBalance['rows'] as $row) {
+                    fputcsv($handle, [
+                        $row['account'],
+                        $row['debit'] > 0 ? $format($row['debit']) : '',
+                        $row['credit'] > 0 ? $format($row['credit']) : '',
+                        $row['transactions'] > 0 ? $row['transactions'] : '',
+                    ]);
+                }
+                fputcsv($handle, ['TOTAL', $format($trialBalance['totals']['debit_total']), $format($trialBalance['totals']['credit_total']), '']);
+                fputcsv($handle, ['Difference', $format($trialBalance['totals']['difference']), '', '']);
+                fputcsv($handle, []);
+            }
+
+            if (in_array($statement, ['all', 'statement_of_expenditures'], true)) {
+                fputcsv($handle, ['Statement of Expenditures']);
+                fputcsv($handle, ['Expense Type', 'Transactions', 'Total Amount']);
+                foreach ($statementOfExpenditures['by_type'] as $row) {
+                    fputcsv($handle, [
+                        $row['expense_type'],
+                        $row['transactions'],
+                        $format($row['total_amount']),
+                    ]);
+                }
+                fputcsv($handle, ['TOTAL', $statementOfExpenditures['totals']['transactions'], $format($statementOfExpenditures['totals']['total_amount'])]);
+                fputcsv($handle, []);
+                fputcsv($handle, ['Monthly Expenditures']);
+                fputcsv($handle, ['Month', 'Transactions', 'Total Amount']);
+                foreach ($statementOfExpenditures['by_month'] as $row) {
+                    fputcsv($handle, [
+                        $row['month'],
+                        $row['transactions'],
+                        $format($row['total_amount']),
+                    ]);
+                }
+                fputcsv($handle, []);
+            }
+
+            if (in_array($statement, ['all', 'cash_receipts_disbursements'], true)) {
+                fputcsv($handle, ['Cash Receipts and Disbursements']);
+                fputcsv($handle, ['Opening Balance', $format($cashReceiptsDisbursements['opening_balance'])]);
+                fputcsv($handle, []);
+                fputcsv($handle, [
+                    'Month',
+                    'Opening Balance',
+                    'Revenue Receipts',
+                    'Credit Adjustments',
+                    'Total Receipts',
+                    'Expense Disbursements',
+                    'Debit Adjustments',
+                    'Total Disbursements',
+                    'Net Change',
+                    'Closing Balance',
+                ]);
+                foreach ($cashReceiptsDisbursements['rows'] as $row) {
+                    fputcsv($handle, [
+                        $row['month'],
+                        $format($row['opening_balance']),
+                        $format($row['revenue_receipts']),
+                        $format($row['credit_adjustments']),
+                        $format($row['total_receipts']),
+                        $format($row['expense_disbursements']),
+                        $format($row['debit_adjustments']),
+                        $format($row['total_disbursements']),
+                        $format($row['net_change']),
+                        $format($row['closing_balance']),
+                    ]);
+                }
+                fputcsv($handle, [
+                    'TOTAL',
+                    '',
+                    $format($cashReceiptsDisbursements['totals']['revenue_receipts']),
+                    $format($cashReceiptsDisbursements['totals']['credit_adjustments']),
+                    $format($cashReceiptsDisbursements['totals']['total_receipts']),
+                    $format($cashReceiptsDisbursements['totals']['expense_disbursements']),
+                    $format($cashReceiptsDisbursements['totals']['debit_adjustments']),
+                    $format($cashReceiptsDisbursements['totals']['total_disbursements']),
+                    $format($cashReceiptsDisbursements['totals']['net_change']),
+                    $format($cashReceiptsDisbursements['closing_balance']),
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, $headers);
+    }
+
     public function storeDisbursementRequest(Request $request)
     {
         $validated = $request->validate([
@@ -1207,6 +1349,276 @@ class FinancialManagementController extends Controller
                 ->whereDate('paid_at', now()->toDateString())
                 ->sum('amount'),
         ];
+    }
+
+    private function extractStatementFilters(Request $request): array
+    {
+        return [
+            'date_from' => trim((string) $request->query('date_from', '')),
+            'date_to' => trim((string) $request->query('date_to', '')),
+            'statement' => trim((string) $request->query('statement', 'all')),
+        ];
+    }
+
+    private function statementDateRange(array $filters): array
+    {
+        $dateFrom = $filters['date_from'] !== ''
+            ? Carbon::parse($filters['date_from'])->startOfDay()
+            : now()->startOfYear();
+        $dateTo = $filters['date_to'] !== ''
+            ? Carbon::parse($filters['date_to'])->endOfDay()
+            : now()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            [$dateFrom, $dateTo] = [$dateTo->copy()->startOfDay(), $dateFrom->copy()->endOfDay()];
+        }
+
+        return [$dateFrom, $dateTo];
+    }
+
+    private function buildTrialBalance(Carbon $dateFrom, Carbon $dateTo): array
+    {
+        $openingBalance = $this->openingBalanceAt($dateFrom);
+
+        $revenueRows = Payment::query()
+            ->where('transaction_type', 'revenue')
+            ->where('workflow_status', 'paid')
+            ->whereBetween('paid_at', [$dateFrom, $dateTo])
+            ->selectRaw('COALESCE(NULLIF(revenue_source, ""), "other_income") as account')
+            ->selectRaw('COUNT(*) as transactions')
+            ->selectRaw('SUM(amount) as total_amount')
+            ->groupBy('account')
+            ->orderBy('account')
+            ->get();
+
+        $expenseRows = Payment::query()
+            ->where('transaction_type', 'expense')
+            ->where('workflow_status', 'paid')
+            ->whereBetween('paid_at', [$dateFrom, $dateTo])
+            ->selectRaw('COALESCE(NULLIF(expense_type, ""), "other_expense") as account')
+            ->selectRaw('COUNT(*) as transactions')
+            ->selectRaw('SUM(amount) as total_amount')
+            ->groupBy('account')
+            ->orderBy('account')
+            ->get();
+
+        $creditAdjustments = (float) FundAdjustment::query()
+            ->where('adjustment_type', 'credit')
+            ->whereBetween('adjusted_at', [$dateFrom, $dateTo])
+            ->sum('amount');
+        $debitAdjustments = (float) FundAdjustment::query()
+            ->where('adjustment_type', 'debit')
+            ->whereBetween('adjusted_at', [$dateFrom, $dateTo])
+            ->sum('amount');
+
+        $periodRevenue = (float) $revenueRows->sum('total_amount');
+        $periodExpense = (float) $expenseRows->sum('total_amount');
+        $closingBalance = $openingBalance + $periodRevenue + $creditAdjustments - $periodExpense - $debitAdjustments;
+
+        $rows = [];
+        $addRow = function (string $account, float $amount, string $defaultSide, int $transactions = 0) use (&$rows): void {
+            if ($amount === 0.0) {
+                return;
+            }
+
+            $debit = 0.0;
+            $credit = 0.0;
+            if ($defaultSide === 'debit') {
+                if ($amount >= 0) {
+                    $debit = $amount;
+                } else {
+                    $credit = abs($amount);
+                }
+            } else {
+                if ($amount >= 0) {
+                    $credit = $amount;
+                } else {
+                    $debit = abs($amount);
+                }
+            }
+
+            $rows[] = [
+                'account' => $account,
+                'debit' => $debit,
+                'credit' => $credit,
+                'transactions' => $transactions,
+            ];
+        };
+
+        $addRow('Cash on Hand (Closing)', $closingBalance, 'debit');
+        $addRow('Opening Fund Balance', $openingBalance, 'credit');
+
+        foreach ($revenueRows as $row) {
+            $addRow('Revenue - '.str_replace('_', ' ', (string) $row->account), (float) $row->total_amount, 'credit', (int) $row->transactions);
+        }
+        foreach ($expenseRows as $row) {
+            $addRow('Expense - '.str_replace('_', ' ', (string) $row->account), (float) $row->total_amount, 'debit', (int) $row->transactions);
+        }
+        $addRow('Fund Adjustment - Credit', $creditAdjustments, 'credit');
+        $addRow('Fund Adjustment - Debit', $debitAdjustments, 'debit');
+
+        $debitTotal = (float) collect($rows)->sum('debit');
+        $creditTotal = (float) collect($rows)->sum('credit');
+
+        return [
+            'rows' => $rows,
+            'totals' => [
+                'debit_total' => $debitTotal,
+                'credit_total' => $creditTotal,
+                'difference' => $debitTotal - $creditTotal,
+            ],
+        ];
+    }
+
+    private function buildStatementOfExpenditures(Carbon $dateFrom, Carbon $dateTo): array
+    {
+        $expenseRows = Payment::query()
+            ->where('transaction_type', 'expense')
+            ->where('workflow_status', 'paid')
+            ->whereBetween('paid_at', [$dateFrom, $dateTo])
+            ->orderBy('paid_at')
+            ->get(['id', 'paid_at', 'expense_type', 'description', 'request_reference', 'voucher_number', 'amount']);
+
+        $byType = $expenseRows
+            ->groupBy(fn ($row) => (string) ($row->expense_type ?: 'other_expense'))
+            ->map(fn ($items, $expenseType) => [
+                'expense_type' => $expenseType,
+                'transactions' => (int) $items->count(),
+                'total_amount' => (float) $items->sum('amount'),
+            ])
+            ->sortByDesc('total_amount')
+            ->values()
+            ->all();
+
+        $byMonth = $expenseRows
+            ->groupBy(fn ($row) => optional($row->paid_at)->format('Y-m'))
+            ->map(fn ($items, $month) => [
+                'month' => $month,
+                'transactions' => (int) $items->count(),
+                'total_amount' => (float) $items->sum('amount'),
+            ])
+            ->sortBy('month')
+            ->values()
+            ->all();
+
+        return [
+            'by_type' => $byType,
+            'by_month' => $byMonth,
+            'items' => $expenseRows->map(function ($row) {
+                return [
+                    'id' => $row->id,
+                    'paid_at' => optional($row->paid_at)->toDateTimeString(),
+                    'expense_type' => $row->expense_type ?: 'other_expense',
+                    'description' => $row->description,
+                    'request_reference' => $row->request_reference,
+                    'voucher_number' => $row->voucher_number,
+                    'amount' => (float) $row->amount,
+                ];
+            })->values()->all(),
+            'totals' => [
+                'transactions' => (int) $expenseRows->count(),
+                'total_amount' => (float) $expenseRows->sum('amount'),
+            ],
+        ];
+    }
+
+    private function buildCashReceiptsDisbursements(Carbon $dateFrom, Carbon $dateTo): array
+    {
+        $openingBalance = $this->openingBalanceAt($dateFrom);
+        $runningBalance = $openingBalance;
+
+        $paymentRows = Payment::query()
+            ->where('workflow_status', 'paid')
+            ->whereBetween('paid_at', [$dateFrom, $dateTo])
+            ->orderBy('paid_at')
+            ->get(['paid_at', 'transaction_type', 'amount']);
+
+        $adjustmentRows = FundAdjustment::query()
+            ->whereBetween('adjusted_at', [$dateFrom, $dateTo])
+            ->orderBy('adjusted_at')
+            ->get(['adjusted_at', 'adjustment_type', 'amount']);
+
+        $monthCursor = $dateFrom->copy()->startOfMonth();
+        $monthEnd = $dateTo->copy()->endOfMonth();
+        $rows = [];
+
+        while ($monthCursor->lte($monthEnd)) {
+            $period = $monthCursor->format('Y-m');
+
+            $revenueReceipts = (float) $paymentRows
+                ->filter(fn ($row) => optional($row->paid_at)->format('Y-m') === $period && $row->transaction_type === 'revenue')
+                ->sum('amount');
+            $expenseDisbursements = (float) $paymentRows
+                ->filter(fn ($row) => optional($row->paid_at)->format('Y-m') === $period && $row->transaction_type === 'expense')
+                ->sum('amount');
+            $creditAdjustments = (float) $adjustmentRows
+                ->filter(fn ($row) => optional($row->adjusted_at)->format('Y-m') === $period && $row->adjustment_type === 'credit')
+                ->sum('amount');
+            $debitAdjustments = (float) $adjustmentRows
+                ->filter(fn ($row) => optional($row->adjusted_at)->format('Y-m') === $period && $row->adjustment_type === 'debit')
+                ->sum('amount');
+
+            $totalReceipts = $revenueReceipts + $creditAdjustments;
+            $totalDisbursements = $expenseDisbursements + $debitAdjustments;
+            $netChange = $totalReceipts - $totalDisbursements;
+            $closingBalance = $runningBalance + $netChange;
+
+            $rows[] = [
+                'month' => $period,
+                'opening_balance' => $runningBalance,
+                'revenue_receipts' => $revenueReceipts,
+                'credit_adjustments' => $creditAdjustments,
+                'total_receipts' => $totalReceipts,
+                'expense_disbursements' => $expenseDisbursements,
+                'debit_adjustments' => $debitAdjustments,
+                'total_disbursements' => $totalDisbursements,
+                'net_change' => $netChange,
+                'closing_balance' => $closingBalance,
+            ];
+
+            $runningBalance = $closingBalance;
+            $monthCursor->addMonth();
+        }
+
+        return [
+            'opening_balance' => $openingBalance,
+            'rows' => $rows,
+            'totals' => [
+                'revenue_receipts' => (float) collect($rows)->sum('revenue_receipts'),
+                'credit_adjustments' => (float) collect($rows)->sum('credit_adjustments'),
+                'total_receipts' => (float) collect($rows)->sum('total_receipts'),
+                'expense_disbursements' => (float) collect($rows)->sum('expense_disbursements'),
+                'debit_adjustments' => (float) collect($rows)->sum('debit_adjustments'),
+                'total_disbursements' => (float) collect($rows)->sum('total_disbursements'),
+                'net_change' => (float) collect($rows)->sum('net_change'),
+            ],
+            'closing_balance' => $runningBalance,
+        ];
+    }
+
+    private function openingBalanceAt(Carbon $dateFrom): float
+    {
+        $baseFunds = (float) (SystemSetting::current()->barangay_funds ?? 0);
+        $revenueBefore = (float) Payment::query()
+            ->where('transaction_type', 'revenue')
+            ->where('workflow_status', 'paid')
+            ->where('paid_at', '<', $dateFrom)
+            ->sum('amount');
+        $expenseBefore = (float) Payment::query()
+            ->where('transaction_type', 'expense')
+            ->where('workflow_status', 'paid')
+            ->where('paid_at', '<', $dateFrom)
+            ->sum('amount');
+        $creditsBefore = (float) FundAdjustment::query()
+            ->where('adjustment_type', 'credit')
+            ->where('adjusted_at', '<', $dateFrom)
+            ->sum('amount');
+        $debitsBefore = (float) FundAdjustment::query()
+            ->where('adjustment_type', 'debit')
+            ->where('adjusted_at', '<', $dateFrom)
+            ->sum('amount');
+
+        return $baseFunds + $revenueBefore + $creditsBefore - $expenseBefore - $debitsBefore;
     }
 
     private function extractFilters(Request $request, string $defaultSort = 'paid_at'): array

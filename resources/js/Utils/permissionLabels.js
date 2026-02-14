@@ -36,6 +36,8 @@ const moduleMap = {
     funds: "Funds",
     budget: "Budget",
     disbursement: "Disbursement",
+    statements: "Statements",
+    statement: "Statement",
 };
 
 const actionMap = {

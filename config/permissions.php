@@ -37,6 +37,7 @@ return [
             'finance.disbursement.request',
             'finance.disbursement.approve',
             'finance.disbursement.release',
+            'finance.statements.view',
             'payment_processing.view',
             'official_receipts.view',
             'collection_reports.view',
@@ -82,6 +83,7 @@ return [
             'collection_reports.view',
             'transaction_history.view',
             'financial_summary.view',
+            'finance.statements.view',
             'finance.budget.view',
             'finance.budget.approve',
             'finance.disbursement.view',
@@ -139,6 +141,7 @@ return [
             'finance.disbursement.view',
             'finance.disbursement.request',
             'finance.disbursement.release',
+            'finance.statements.view',
             'reports.view',
         ],
         'committee_access_user' => [

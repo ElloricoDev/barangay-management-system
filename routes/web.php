@@ -183,6 +183,12 @@ Route::prefix('admin')
         Route::get('/financial-summary', [FinancialManagementController::class, 'financialSummary'])
             ->middleware('permission:financial_summary.view')
             ->name('financial-summary');
+        Route::get('/financial-statements', [FinancialManagementController::class, 'financialStatements'])
+            ->middleware('permission:finance.statements.view')
+            ->name('financial-statements');
+        Route::get('/financial-statements/export', [FinancialManagementController::class, 'exportFinancialStatements'])
+            ->middleware('permission:finance.reports.export')
+            ->name('financial-statements.export');
         Route::post('/payments', [FinancialManagementController::class, 'store'])
             ->middleware('permission:finance.record')
             ->name('payments.store');
